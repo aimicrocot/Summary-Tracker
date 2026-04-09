@@ -1,3 +1,30 @@
+// Импорты (только проверенные и 100% рабочие!)
+import { extension_settings, getContext } from "../../../extensions.js";
+import { saveSettingsDebounced } from "../../../../script.js";
+
+const extensionName = "facts-memory-tracker";
+const extensionFolderPath = `scripts/extensions/third-party/${extensionName}`;
+
+const defaultSettings = {
+    autoScan: false,
+};
+
+function loadSettings() {
+    extension_settings[extensionName] = extension_settings[extensionName] || {};
+    if (Object.keys(extension_settings[extensionName]).length === 0) {
+        Object.assign(extension_settings[extensionName], defaultSettings);
+    }
+    $("#fmt_auto_scan").prop("checked", extension_settings[extensionName].autoScan);
+}
+
+function onAutoScanChange(event) {
+    const value = Boolean($(event.target).prop("checked"));
+    extension_settings[extensionName].autoScan = value;
+    saveSettingsDebounced();
+    console.log(`[${extensionName}] Auto-scan toggled:`, value);
+}
+
+// ФУНКЦИЯ СКАНЕР
 async function onManualScanClick() {
     const context = getContext();
     const chat = context.chat;
@@ -44,3 +71,18 @@ async function onManualScanClick() {
         }
     }
 }
+
+jQuery(async () => {
+    try {
+        const settingsHtml = await $.get(`${extensionFolderPath}/example.html`);
+        $("#extensions_settings2").append(settingsHtml);
+       
+        $("#fmt_auto_scan").on("input", onAutoScanChange);
+        $("#fmt_manual_scan").on("click", onManualScanClick); // Привязка кнопки
+       
+        loadSettings();
+        console.log(`[${extensionName}] ✅ Safe Stage 4 Loaded`);
+    } catch (error) {
+        console.error(`[${extensionName}] ❌ Load failed:`, error);
+    }
+});
