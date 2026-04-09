@@ -7,18 +7,20 @@
         <div class="inline-drawer-content">
             <div class="flex-container">
                 <input id="fmt_auto_scan" type="checkbox" />
-                <label for="fmt_auto_scan">Включить авто-сканирование (каждые 4 сообщ.)</label>
+                <label for="fmt_auto_scan">Включить авто-сканирование</label>
             </div>
-            <p><small>Если включено, расширение будет автоматически выцеплять факты.</small></p>
             
             <hr />
             
-            <input id="fmt_manual_scan" class="menu_button" type="submit" value="Сканировать сейчас" />
-            
-            <div style="margin-top:10px; padding:5px; border-left: 3px solid #4a90e2; background: rgba(0,0,0,0.2);">
-                <small style="opacity:0.6;">Последний найденный факт:</small>
-                <div id="fmt_last_fact_display" style="font-style: italic; margin-top:5px;">
-                    Нажмите «Сканировать», чтобы начать...
+            <div style="display: flex; gap: 10px;">
+                <input id="fmt_manual_scan" class="menu_button" type="submit" value="Сканировать сообщение" />
+                <input id="fmt_clear_facts" class="menu_button" type="submit" value="Очистить список" style="background-color: #5c1d1d !important;" />
+            </div>
+
+            <div style="margin-top:15px;">
+                <b>Сохраненные факты:</b>
+                <div id="fmt_facts_list" style="margin-top:10px; max-height: 200px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.1); padding: 5px; border-radius: 5px;">
+                    <small style="opacity:0.5;">Список пуст...</small>
                 </div>
             </div>
         </div>
