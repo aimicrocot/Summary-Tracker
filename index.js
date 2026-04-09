@@ -1,6 +1,8 @@
-// Импорты из ядра SillyTavern
+// Импорты
 import { extension_settings, getContext } from "../../../extensions.js";
 import { saveSettingsDebounced } from "../../../../script.js";
+// NEW: Импорт функции для тихого запроса к ИИ
+import { generateQuiet } from "../../../../../scripts/utils.js";
 
 const extensionName = "facts-memory-tracker";
 const extensionFolderPath = `scripts/extensions/third-party/${extensionName}`;
@@ -9,62 +11,66 @@ const defaultSettings = {
     autoScan: false,
 };
 
-// Загрузка настроек
 function loadSettings() {
     extension_settings[extensionName] = extension_settings[extensionName] || {};
     if (Object.keys(extension_settings[extensionName]).length === 0) {
         Object.assign(extension_settings[extensionName], defaultSettings);
     }
-    // Устанавливаем галочку в UI согласно сохраненным настройкам
     $("#fmt_auto_scan").prop("checked", extension_settings[extensionName].autoScan);
 }
 
-// Сохранение при переключении чекбокса
 function onAutoScanChange(event) {
     const value = Boolean($(event.target).prop("checked"));
     extension_settings[extensionName].autoScan = value;
     saveSettingsDebounced();
-    console.log(`[${extensionName}] Auto-scan toggled:`, value);
 }
 
-// ФУНКЦИЯ СКАНЕР: выполняется при нажатии кнопки
+// ФУНКЦИЯ ГЕНЕРАЦИИ ФАКТА
 async function onManualScanClick() {
-    console.log(`[${extensionName}] Manual scan triggered...`);
-    
-    // Получаем текущий контекст чата
     const context = getContext();
-    const chat = context.chat; 
+    const chat = context.chat;
     
-    if (!chat || chat.length === 0) {
-        console.warn(`[${extensionName}] Chat is empty!`);
-        toastr.warning("Чат пуст, нечего сканировать.");
+    if (!chat || chat.length <= 4) {
+        toastr.info("Нужно больше 4 сообщений для анализа.");
         return;
     }
 
-    // Выводим информацию в консоль для проверки
-    console.log(`[${extensionName}] Сообщений в чате: ${chat.length}`);
-    const lastMessage = chat[chat.length - 1];
-    console.log(`[${extensionName}] Последнее сообщение:`, lastMessage.mes);
+    toastr.info("Анализирую сообщение...", "Facts Memory Tracker");
     
-    // Показываем уведомление в интерфейсе ST
-    toastr.info(`Найдено сообщений: ${chat.length}. Текст последнего лога в консоли (F12).`, "Facts Memory Tracker");
+    // Берем 5-е сообщение с конца (чтобы не трогать последние 4)
+    const targetIndex = chat.length - 5;
+    const messageToAnalyze = chat[targetIndex].mes;
+    
+    // Промпт для ИИ
+    const prompt = `Проанализируй следующее сообщение и выдели из него ОДИН важный факт о персонаже или событии. 
+Ответь строго ОДНИМ коротким предложением.
+Сообщение: "${messageToAnalyze}"
+Факт:`;
+
+    try {
+        console.log(`[${extensionName}] Отправка промпта к ИИ...`);
+        
+        // Отправляем запрос
+        const result = await generateQuiet(prompt);
+        
+        console.log(`[${extensionName}] ИИ выделил факт:`, result);
+        toastr.success("Факт успешно создан! Проверьте консоль (F12).", "Facts Memory Tracker");
+        
+    } catch (error) {
+        console.error(`[${extensionName}] Ошибка генерации:`, error);
+        toastr.error("ИИ не смог ответить. Проверьте подключение к API.");
+    }
 }
 
 jQuery(async () => {
-    console.log(`[${extensionName}] Loading Stage 3...`);
-   
     try {
         const settingsHtml = await $.get(`${extensionFolderPath}/example.html`);
         $("#extensions_settings2").append(settingsHtml);
-       
-        // Привязываем события к элементам интерфейса
         $("#fmt_auto_scan").on("input", onAutoScanChange);
         $("#fmt_manual_scan").on("click", onManualScanClick);
-       
         loadSettings();
-       
-        console.log(`[${extensionName}] ✅ Stage 3 loaded successfully`);
+        console.log(`[${extensionName}] ✅ Stage 4 Loaded`);
     } catch (error) {
-        console.error(`[${extensionName}] ❌ Failed to load Stage 3:`, error);
+        console.error(`[${extensionName}] ❌ Load failed:`, error);
     }
 });
