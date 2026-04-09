@@ -1,9 +1,10 @@
-import { extension_settings, getContext, eventSource, event_types } from "../../../extensions.js";
+import { extension_settings, getContext } from "../../../extensions.js";
 import { saveSettingsDebounced } from "../../../../script.js";
 
 const extensionName = "facts-memory-tracker";
 const extensionFolderPath = `scripts/extensions/third-party/${extensionName}`;
 
+// Настройки по умолчанию теперь включают массив фактов
 const defaultSettings = {
     autoScan: false,
     facts: [] 
@@ -14,13 +15,17 @@ function loadSettings() {
     if (Object.keys(extension_settings[extensionName]).length === 0) {
         Object.assign(extension_settings[extensionName], defaultSettings);
     }
-    if (!extension_settings[extensionName].facts) extension_settings[extensionName].facts = [];
+    
+    // Если по какой-то причине фактов нет, создаем пустой массив
+    if (!extension_settings[extensionName].facts) {
+        extension_settings[extensionName].facts = [];
+    }
 
     $("#fmt_auto_scan").prop("checked", extension_settings[extensionName].autoScan);
-    renderFacts();
+    renderFacts(); // Отрисовываем список при загрузке
 }
 
-// Рендер списка с кнопками удаления
+// Функция для отрисовки списка на экране
 function renderFacts() {
     const listContainer = $("#fmt_facts_list");
     const facts = extension_settings[extensionName].facts;
@@ -30,51 +35,41 @@ function renderFacts() {
         return;
     }
 
-    let html = '<div style="display: flex; flex-direction: column; gap: 5px;">';
+    let html = '<ul style="padding-left: 20px; margin: 0;">';
     facts.forEach((fact, index) => {
-        html += `
-            <div style="display: flex; justify-content: space-between; align-items: start; background: rgba(255,255,255,0.05); padding: 5px; border-radius: 3px;">
-                <span style="font-size: 0.9em; line-height: 1.2;">• ${fact}</span>
-                <i class="fa-solid fa-trash fmt-delete-btn" data-index="${index}" style="cursor: pointer; color: #ff5555; margin-left: 10px; font-size: 0.8em;"></i>
-            </div>`;
+        html += `<li style="margin-bottom: 5px;">${fact}</li>`;
     });
-    html += '</div>';
+    html += '</ul>';
     listContainer.html(html);
-
-    // Вешаем клик на корзинки
-    $(".fmt-delete-btn").on("click", function() {
-        const index = $(this).data("index");
-        deleteFact(index);
-    });
-}
-
-function deleteFact(index) {
-    extension_settings[extensionName].facts.splice(index, 1);
-    saveSettingsDebounced();
-    renderFacts();
 }
 
 function onAutoScanChange(event) {
     const value = Boolean($(event.target).prop("checked"));
     extension_settings[extensionName].autoScan = value;
     saveSettingsDebounced();
-    console.log(`[${extensionName}] Auto-scan set to:`, value);
 }
 
+// Очистка списка
 function clearFacts() {
-    if (confirm("Удалить все факты?")) {
+    if (confirm("Вы уверены, что хотите удалить все найденные факты?")) {
         extension_settings[extensionName].facts = [];
         saveSettingsDebounced();
         renderFacts();
+        toastr.info("Список очищен");
     }
 }
 
-// ОСНОВНАЯ ЛОГИКА СКАНЕРА (вынесена в отдельную функцию)
-async function runScan() {
+async function onManualScanClick() {
     const context = getContext();
     const chat = context.chat;
-    if (!chat || chat.length === 0) return;
+    
+    if (!chat || chat.length === 0) {
+        toastr.info("Чат пуст.");
+        return;
+    }
 
+    toastr.info("Анализирую...", "Facts Memory Tracker");
+    
     const lastMessage = chat[chat.length - 1].mes;
     const promptText = `Analyze the following text and extract one short factual statement about the character. Respond ONLY with the fact: "${lastMessage}"`;
 
@@ -86,28 +81,18 @@ async function runScan() {
         
         if (response) {
             const newFact = response.trim();
+            
+            // СОХРАНЕНИЕ: Добавляем в массив и сохраняем в ST
             extension_settings[extensionName].facts.push(newFact);
             saveSettingsDebounced();
+            
+            // Обновляем UI
             renderFacts();
-            return newFact;
+            toastr.success("Факт добавлен в список!");
         }
     } catch (error) {
-        console.error(`[${extensionName}] Scan failed:`, error);
-    }
-}
-
-// Обработчик новых сообщений
-async function onMessageReceived() {
-    if (!extension_settings[extensionName].autoScan) return;
-
-    const context = getContext();
-    const chat = context.chat;
-
-    // Проверяем: если количество сообщений кратно 4 (и не равно 0)
-    if (chat && chat.length > 0 && chat.length % 4 === 0) {
-        console.log(`[${extensionName}] Авто-сканирование (сообщение #${chat.length})`);
-        toastr.info("Авто-сканирование фактов...");
-        await runScan();
+        console.error(`[${extensionName}] Ошибка:`, error);
+        toastr.error("ИИ не ответил.");
     }
 }
 
@@ -117,19 +102,11 @@ jQuery(async () => {
         $("#extensions_settings2").append(settingsHtml);
        
         $("#fmt_auto_scan").on("input", onAutoScanChange);
-        $("#fmt_manual_scan").on("click", async () => {
-            toastr.info("Ручное сканирование...");
-            await runScan();
-        });
-        $("#fmt_clear_facts").on("click", clearFacts);
+        $("#fmt_manual_scan").on("click", onManualScanClick);
+        $("#fmt_clear_facts").on("click", clearFacts); // Кнопка очистки
        
         loadSettings();
-
-        // ПОДКЛЮЧАЕМ СЛУШАТЕЛЬ СОБЫТИЙ ST
-        eventSource.on(event_types.MESSAGE_RECEIVED, onMessageReceived);
-        eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, onMessageReceived);
-
-        console.log(`[${extensionName}] ✅ Stage 6 (Auto-Scan) Loaded`);
+        console.log(`[${extensionName}] ✅ Stage 5 (Persistence) Loaded`);
     } catch (error) {
         console.error(`[${extensionName}] ❌ Load failed:`, error);
     }
