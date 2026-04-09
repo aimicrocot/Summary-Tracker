@@ -1,23 +1,51 @@
 // Импорты из ядра SillyTavern
-import { extension_settings, getContext, loadExtensionSettings } from "../../../extensions.js";
+import { extension_settings } from "../../../extensions.js";
 import { saveSettingsDebounced } from "../../../../script.js";
 
-// Имя расширения ДОЛЖНО точно совпадать с именем папки на GitHub/в SillyTavern
-const extensionName = "facts-memory-tracker"; 
+const extensionName = "facts-memory-tracker";
 const extensionFolderPath = `scripts/extensions/third-party/${extensionName}`;
 
-// Инициализация расширения
+// Настройки по умолчанию
+const defaultSettings = {
+    autoScan: false,
+};
+
+// Загрузка настроек
+function loadSettings() {
+    // Инициализируем настройки расширения, если их нет
+    extension_settings[extensionName] = extension_settings[extensionName] || {};
+    
+    // Слияние с настройками по умолчанию
+    if (Object.keys(extension_settings[extensionName]).length === 0) {
+        Object.assign(extension_settings[extensionName], defaultSettings);
+    }
+
+    // Устанавливаем состояние чекбокса в UI
+    $("#fmt_auto_scan").prop("checked", extension_settings[extensionName].autoScan);
+}
+
+// Обработка изменения чекбокса
+function onAutoScanChange(event) {
+    const value = Boolean($(event.target).prop("checked"));
+    extension_settings[extensionName].autoScan = value;
+    saveSettingsDebounced();
+    console.log(`[${extensionName}] Auto-scan toggled:`, value);
+}
+
 jQuery(async () => {
-    console.log(`[${extensionName}] Loading...`);
+    console.log(`[${extensionName}] Loading Stage 2...`);
    
     try {
-        // Загрузка HTML из файла
         const settingsHtml = await $.get(`${extensionFolderPath}/example.html`);
-       
-        // Добавление в панель настроек (правая колонка для UI расширений, там же где и Саммари)
         $("#extensions_settings2").append(settingsHtml);
        
-        console.log(`[${extensionName}] ✅ Loaded successfully`);
+        // Привязываем событие к чекбоксу
+        $("#fmt_auto_scan").on("input", onAutoScanChange);
+       
+        // Загружаем сохраненные настройки
+        loadSettings();
+       
+        console.log(`[${extensionName}] ✅ Stage 2 loaded`);
     } catch (error) {
         console.error(`[${extensionName}] ❌ Failed to load:`, error);
     }
