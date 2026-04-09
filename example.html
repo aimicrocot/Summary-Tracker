@@ -5,11 +5,18 @@
             <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
         </div>
         <div class="inline-drawer-content">
-            <div class="flex-container">
+            <div class="flex-container" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
                 <input id="fmt_auto_scan" type="checkbox" />
                 <label for="fmt_auto_scan">Включить авто-сканирование (каждые 4 сообщ.)</label>
             </div>
-            <p><small>Если включено, расширение будет автоматически выцеплять факты.</small></p>
+            
+            <hr />
+
+            <div style="margin-top: 10px;">
+                <input id="fmt_manual_scan" class="menu_button" type="submit" value="Сканировать сейчас" />
+            </div>
+            
+            <p><small>Нажмите для проверки доступа к сообщениям чата.</small></p>
         </div>
     </div>
 </div>
