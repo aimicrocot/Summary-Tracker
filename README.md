@@ -7,7 +7,7 @@ Installation
 
 1. Open SillyTavern
 
-2. Go to the Extensions tab → Install Extension
+2. Go to the Extensions → Install Extension
 
 3. Paste the link to this GitHub repository
 
