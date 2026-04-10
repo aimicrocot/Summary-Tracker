@@ -1,6 +1,8 @@
 # Minimalist Facts Memory Tracker
 
 ## Eng ReadMe
+
+<details>
 An extension that allows hiding messages from the context and summarizing their essence, sending only the most important information to the chat context to save tokens (work in progress).
 
 ## Installation
@@ -26,3 +28,4 @@ Extensions with similar functionality that I’ve seen:
 - https://github.com/smoksshit-cmd/FactsMemoryTracker
 
 - https://github.com/smoksshit-cmd/SecretsRevelationsTracker
+- </details>
