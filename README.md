@@ -19,7 +19,7 @@ Look for "Facts Memory Tracker" in the list of extensions in SillyTavern.
 
 ## Inspired by
 
-Extensions with similar functionality that I happened to come across here:
+Extensions with similar functionality that I’ve seen:
 
 https://github.com/KiskaSora/SillyTavern-Horae.git
 
