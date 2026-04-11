@@ -64,7 +64,6 @@ function renderFacts() {
 }
 
 // --- ЛОГИКА СКАНИРОВАНИЯ ---
-
 async function runAutoScan() {
     const context = getContext();
     const chat = context.chat;
@@ -89,7 +88,7 @@ async function runAutoScan() {
 
     if (targetText.trim() === "") return;
 
-    // 1.3. Формирование строгого промпта (объединение лучших практик)
+    // 1.3. Формирование строгого промпта
     const promptText = `TASK: Extract facts ONLY from the "NEW CHAT DATA" provided below.
 STRICT RULES:
 1. Ignore any previous knowledge about the character.
@@ -117,8 +116,7 @@ ${targetText}`;
 
                 // Разбиваем ответ на отдельные факты
                 const facts = responseText
-                    .split('
-')
+                    .split('\n')
                     .map(line => line.trim())
                     .filter(line => line.length > 0)
                     .map(line => {
