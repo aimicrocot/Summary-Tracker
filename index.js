@@ -1,5 +1,5 @@
-import { extension_settings, getContext, eventSource, event_types } from "../../../extensions.js";
-import { saveSettingsDebounced } from "../../../../script.js";
+import { extension_settings, getContext } from "../../../extensions.js";
+import { saveSettingsDebounced, eventSource, event_types } from "../../../../script.js";
 
 const extensionName = "facts-memory-tracker";
 const extensionFolderPath = `scripts/extensions/third-party/${extensionName}`;
@@ -24,15 +24,18 @@ function loadSettings() {
 function renderFacts() {
     const listContainer = $("#fmt_facts_list");
     const facts = extension_settings[extensionName].facts;
+    
     if (facts.length === 0) {
         listContainer.html('<small style="opacity:0.5;">Список пуст...</small>');
         return;
     }
+    
     let html = '<ul style="padding-left: 20px; margin: 0;">';
     facts.forEach((fact) => {
         html += `<li style="margin-bottom: 5px;">${fact}</li>`;
     });
     html += '</ul>';
+    
     listContainer.html(html);
 }
 
@@ -51,7 +54,6 @@ function clearFacts() {
     }
 }
 
-// Вынесли логику сканирования в общую функцию
 async function runAutoScan() {
     const context = getContext();
     const chat = context.chat;
@@ -61,7 +63,6 @@ async function runAutoScan() {
     const promptText = `Analyze the following text and extract one short factual statement about the character. Respond ONLY with the fact: "${lastMessage}"`;
 
     try {
-        // Используем проверенный метод generateRaw
         const response = await window.SillyTavern.getContext().generateRaw({
             prompt: promptText,
             text: promptText 
@@ -79,14 +80,12 @@ async function runAutoScan() {
     }
 }
 
-// Функция-обработчик событий чата
 async function handleChatEvent() {
     if (!extension_settings[extensionName].autoScan) return;
 
     const context = getContext();
     const chat = context.chat;
 
-    // Срабатываем на каждом 4-м сообщении (4, 8, 12...)
     if (chat && chat.length > 0 && chat.length % 4 === 0) {
         toastr.info("Авто-сканирование фактов...", "Facts Memory Tracker");
         await runAutoScan();
@@ -108,7 +107,7 @@ jQuery(async () => {
        
         loadSettings();
 
-        // Подписываемся на события БЕЗОПАСНО
+        // Подписка на события чата
         eventSource.on(event_types.MESSAGE_RECEIVED, handleChatEvent);
         eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, handleChatEvent);
 
