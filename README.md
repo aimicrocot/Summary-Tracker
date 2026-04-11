@@ -26,6 +26,8 @@ Look for "Facts Memory Tracker" in the list of extensions in SillyTavern.
 
 Extensions with similar functionality that I’ve seen:
 
+- https://github.com/Kristyku/InlineSummary
+
 - https://github.com/KiskaSora/SillyTavern-Horae.git
 
 - https://github.com/smoksshit-cmd/FactsMemoryTracker
@@ -56,6 +58,8 @@ Extensions with similar functionality that I’ve seen:
 ### Вдохновлено
 
 Расширениями с похожим функционалом, которые мне встречались:
+
+- https://github.com/Kristyku/InlineSummary
 
 - https://github.com/KiskaSora/SillyTavern-Horae.git
 
