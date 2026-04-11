@@ -9,23 +9,32 @@ const defaultSettings = {
     facts: [] 
 };
 
-function loadSettings() {
-    extension_settings[extensionName] = extension_settings[extensionName] || {};
-    if (Object.keys(extension_settings[extensionName]).length === 0) {
-        Object.assign(extension_settings[extensionName], defaultSettings);
-    }
-    if (!extension_settings[extensionName].facts) {
-        extension_settings[extensionName].facts = [];
-    }
-    $("#fmt_auto_scan").prop("checked", extension_settings[extensionName].autoScan);
+// --- ФУНКЦИИ УПРАВЛЕНИЯ (объявлены в начале для доступности) ---
+
+function deleteFact(index) {
+    extension_settings[extensionName].facts.splice(index, 1);
+    saveSettingsDebounced();
     renderFacts();
+    toastr.info("Факт удален");
+}
+
+function editFact(index) {
+    const currentFact = extension_settings[extensionName].facts[index];
+    const newFact = prompt("Редактирование факта:", currentFact);
+    
+    if (newFact !== null && newFact.trim() !== "") {
+        extension_settings[extensionName].facts[index] = newFact.trim();
+        saveSettingsDebounced();
+        renderFacts();
+        toastr.success("Факт обновлен");
+    }
 }
 
 function renderFacts() {
     const listContainer = $("#fmt_facts_list");
     const facts = extension_settings[extensionName].facts;
 
-    if (facts.length === 0) {
+    if (!facts || facts.length === 0) {
         listContainer.html('<small style="opacity:0.5;">Список пуст...</small>');
         return;
     }
@@ -44,32 +53,17 @@ function renderFacts() {
     html += '</div>';
     listContainer.html(html);
 
-    // Вешаем события на новые кнопки
-    $(".fmt-delete-btn").on("click", function() {
-        const index = $(this).data("index");
-        deleteFact(index);
+    // Привязываем события заново при каждой отрисовке
+    $(".fmt-delete-btn").off("click").on("click", function() {
+        deleteFact($(this).data("index"));
     });
 
-    $(".fmt-edit-btn").on("click", function() {
-        const index = $(this).data("index");
-        editFact(index);
+    $(".fmt-edit-btn").off("click").on("click", function() {
+        editFact($(this).data("index"));
     });
 }
 
-function onAutoScanChange(event) {
-    const value = Boolean($(event.target).prop("checked"));
-    extension_settings[extensionName].autoScan = value;
-    saveSettingsDebounced();
-}
-
-function clearFacts() {
-    if (confirm("Вы уверены, что хотите удалить все найденные факты?")) {
-        extension_settings[extensionName].facts = [];
-        saveSettingsDebounced();
-        renderFacts();
-        toastr.info("Список очищен");
-    }
-}
+// --- ЛОГИКА СКАНИРОВАНИЯ ---
 
 async function runAutoScan() {
     const context = getContext();
@@ -87,26 +81,35 @@ async function runAutoScan() {
         
         if (response) {
             const newFact = response.trim();
-            extension_settings[extensionName].facts.push(newFact);
-            saveSettingsDebounced();
-            renderFacts();
-            console.log(`[${extensionName}] Авто-факт добавлен: ${newFact}`);
+            // Минимальная проверка на мусор
+            if (newFact.length > 5 && !newFact.includes("does not contain")) {
+                extension_settings[extensionName].facts.push(newFact);
+                saveSettingsDebounced();
+                renderFacts();
+            }
         }
     } catch (error) {
-        console.error(`[${extensionName}] Ошибка авто-скана:`, error);
+        console.error(`[${extensionName}] Ошибка:`, error);
     }
 }
 
 async function handleChatEvent() {
     if (!extension_settings[extensionName].autoScan) return;
-
-    const context = getContext();
-    const chat = context.chat;
-
+    const chat = getContext().chat;
     if (chat && chat.length > 0 && chat.length % 4 === 0) {
-        toastr.info("Авто-сканирование фактов...", "Facts Memory Tracker");
         await runAutoScan();
     }
+}
+
+// --- ИНИЦИАЛИЗАЦИЯ ---
+
+function loadSettings() {
+    extension_settings[extensionName] = extension_settings[extensionName] || {};
+    if (Object.keys(extension_settings[extensionName]).length === 0) {
+        Object.assign(extension_settings[extensionName], defaultSettings);
+    }
+    $("#fmt_auto_scan").prop("checked", extension_settings[extensionName].autoScan);
+    renderFacts();
 }
 
 jQuery(async () => {
@@ -114,21 +117,29 @@ jQuery(async () => {
         const settingsHtml = await $.get(`${extensionFolderPath}/example.html`);
         $("#extensions_settings2").append(settingsHtml);
        
-        $("#fmt_auto_scan").on("input", onAutoScanChange);
+        $("#fmt_auto_scan").on("input", (e) => {
+            extension_settings[extensionName].autoScan = Boolean($(e.target).prop("checked"));
+            saveSettingsDebounced();
+        });
+
         $("#fmt_manual_scan").on("click", async () => {
-            toastr.info("Анализирую...");
+            toastr.info("Сканирую...");
             await runAutoScan();
             toastr.success("Готово!");
         });
-        $("#fmt_clear_facts").on("click", clearFacts);
+
+        $("#fmt_clear_facts").on("click", () => {
+            if (confirm("Очистить всё?")) {
+                extension_settings[extensionName].facts = [];
+                saveSettingsDebounced();
+                renderFacts();
+            }
+        });
        
         loadSettings();
-
-        // Подписка на события чата
-        eventSource.on(event_types.MESSAGE_RECEIVED, handleChatEvent);
         eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, handleChatEvent);
-
-        console.log(`[${extensionName}] ✅ Safe Automation Loaded`);
+        
+        console.log(`[${extensionName}] ✅ Full Control Loaded`);
     } catch (error) {
         console.error(`[${extensionName}] ❌ Load failed:`, error);
     }
