@@ -24,19 +24,36 @@ function loadSettings() {
 function renderFacts() {
     const listContainer = $("#fmt_facts_list");
     const facts = extension_settings[extensionName].facts;
-    
+
     if (facts.length === 0) {
         listContainer.html('<small style="opacity:0.5;">Список пуст...</small>');
         return;
     }
-    
-    let html = '<ul style="padding-left: 20px; margin: 0;">';
-    facts.forEach((fact) => {
-        html += `<li style="margin-bottom: 5px;">${fact}</li>`;
+
+    let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
+    facts.forEach((fact, index) => {
+        html += `
+            <div class="fmt-fact-item" style="display: flex; justify-content: space-between; align-items: flex-start; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.1);">
+                <div class="fmt-fact-text" style="font-size: 0.9em; flex-grow: 1; margin-right: 10px; word-break: break-word;">${fact}</div>
+                <div style="display: flex; gap: 8px; flex-shrink: 0;">
+                    <i class="fa-solid fa-pen-to-square fmt-edit-btn" data-index="${index}" style="cursor: pointer; color: #4a9eff; font-size: 0.9em;" title="Редактировать"></i>
+                    <i class="fa-solid fa-trash fmt-delete-btn" data-index="${index}" style="cursor: pointer; color: #ff5555; font-size: 0.9em;" title="Удалить"></i>
+                </div>
+            </div>`;
     });
-    html += '</ul>';
-    
+    html += '</div>';
     listContainer.html(html);
+
+    // Вешаем события на новые кнопки
+    $(".fmt-delete-btn").on("click", function() {
+        const index = $(this).data("index");
+        deleteFact(index);
+    });
+
+    $(".fmt-edit-btn").on("click", function() {
+        const index = $(this).data("index");
+        editFact(index);
+    });
 }
 
 function onAutoScanChange(event) {
