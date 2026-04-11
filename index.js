@@ -70,15 +70,34 @@ async function runAutoScan() {
     const chat = context.chat;
     const skipCount = parseInt(extension_settings[extensionName].skipCount) || 2;
 
-    // Проверяем, хватает ли сообщений в чате для отступа
-    if (!chat || chat.length <= skipCount) return;
+    // 1.1. Проверка на наличие сообщений для обработки
+    if (!chat || chat.length <= skipCount) {
+        return;
+    }
 
-    // Высчитываем индекс нужного сообщения
-    const targetIndex = chat.length - 1 - skipCount;
-    if (targetIndex < 0) return;
+    // 1.2. Сбор всех сообщений от начала чата до границы отступа
+    const endIndex = chat.length - skipCount;
+    let targetText = "";
 
-    const targetMessage = chat[targetIndex].mes;
-    const promptText = `Analyze the following text and extract one short factual statement about the character. Respond ONLY with the fact: "${targetMessage}"`;
+    for (let i = 0; i < endIndex; i++) {
+        if (chat[i] && chat[i].mes) {
+            const speaker = chat[i].is_user ? "User" : (chat[i].name || "Character");
+            targetText += `${speaker}: ${chat[i].mes}\n`;
+        }
+    }
+
+    if (targetText.trim() === "") return;
+
+    // 1.3. Формирование строгого промпта (объединение лучших практик)
+    const promptText = `TASK: Extract facts ONLY from the "NEW CHAT DATA" provided below. 
+STRICT RULES:
+1. Ignore any previous knowledge about the character.
+2. Use ONLY information explicitly mentioned in the text below.
+3. Respond with complete, finished sentences. Do not cut off the text.
+4. If no new facts are found, respond with "No new facts".
+
+NEW CHAT DATA:
+${targetText}`;
 
     try {
         const response = await window.SillyTavern.getContext().generateRaw({
@@ -88,14 +107,18 @@ async function runAutoScan() {
         
         if (response) {
             const newFact = response.trim();
-            if (newFact.length > 5 && !newFact.includes("does not contain")) {
+            // 1.4. Фильтрация мусорных ответов
+            if (newFact.length > 5 && 
+                !newFact.toLowerCase().includes("no new facts") && 
+                !newFact.toLowerCase().includes("no information")) {
+                
                 extension_settings[extensionName].facts.push(newFact);
                 saveSettingsDebounced();
                 renderFacts();
             }
         }
     } catch (error) {
-        console.error(`[${extensionName}] Ошибка:`, error);
+        console.error(`[${extensionName}] Ошибка сканирования:`, error);
     }
 }
 
