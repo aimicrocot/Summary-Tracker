@@ -6,10 +6,11 @@ const extensionFolderPath = `scripts/extensions/third-party/${extensionName}`;
 
 const defaultSettings = {
     autoScan: false,
+    skipCount: 2, // Добавлено: значение пропуска по умолчанию
     facts: [] 
 };
 
-// --- ФУНКЦИИ УПРАВЛЕНИЯ (объявлены в начале для доступности) ---
+// --- ФУНКЦИИ УПРАВЛЕНИЯ ---
 
 function deleteFact(index) {
     extension_settings[extensionName].facts.splice(index, 1);
@@ -53,7 +54,6 @@ function renderFacts() {
     html += '</div>';
     listContainer.html(html);
 
-    // Привязываем события заново при каждой отрисовке
     $(".fmt-delete-btn").off("click").on("click", function() {
         deleteFact($(this).data("index"));
     });
@@ -68,10 +68,17 @@ function renderFacts() {
 async function runAutoScan() {
     const context = getContext();
     const chat = context.chat;
-    if (!chat || chat.length === 0) return;
+    const skipCount = parseInt(extension_settings[extensionName].skipCount) || 2;
 
-    const lastMessage = chat[chat.length - 1].mes;
-    const promptText = `Analyze the following text and extract one short factual statement about the character. Respond ONLY with the fact: "${lastMessage}"`;
+    // Проверяем, хватает ли сообщений в чате для отступа
+    if (!chat || chat.length <= skipCount) return;
+
+    // Высчитываем индекс нужного сообщения
+    const targetIndex = chat.length - 1 - skipCount;
+    if (targetIndex < 0) return;
+
+    const targetMessage = chat[targetIndex].mes;
+    const promptText = `Analyze the following text and extract one short factual statement about the character. Respond ONLY with the fact: "${targetMessage}"`;
 
     try {
         const response = await window.SillyTavern.getContext().generateRaw({
@@ -81,7 +88,6 @@ async function runAutoScan() {
         
         if (response) {
             const newFact = response.trim();
-            // Минимальная проверка на мусор
             if (newFact.length > 5 && !newFact.includes("does not contain")) {
                 extension_settings[extensionName].facts.push(newFact);
                 saveSettingsDebounced();
@@ -101,14 +107,25 @@ async function handleChatEvent() {
     }
 }
 
-// --- ИНИЦИАЛИЗАЦИЯ ---
+// --- ИНИЦИАЛИЗАЦИЯ И ОБРАБОТЧИКИ ---
+
+// Функция для динамического обновления максимального значения
+function updateMaxSkip() {
+    const chatLength = getContext().chat?.length || 0;
+    $("#fmt_skip_count").attr("max", chatLength);
+}
 
 function loadSettings() {
     extension_settings[extensionName] = extension_settings[extensionName] || {};
     if (Object.keys(extension_settings[extensionName]).length === 0) {
         Object.assign(extension_settings[extensionName], defaultSettings);
     }
+    
+    // Загружаем сохраненные значения в интерфейс
     $("#fmt_auto_scan").prop("checked", extension_settings[extensionName].autoScan);
+    $("#fmt_skip_count").val(extension_settings[extensionName].skipCount || 2);
+    
+    updateMaxSkip();
     renderFacts();
 }
 
@@ -119,6 +136,20 @@ jQuery(async () => {
        
         $("#fmt_auto_scan").on("input", (e) => {
             extension_settings[extensionName].autoScan = Boolean($(e.target).prop("checked"));
+            saveSettingsDebounced();
+        });
+
+        // Обработчик поля отступа
+        $("#fmt_skip_count").on("input", (e) => {
+            let val = parseInt($(e.target).val());
+            const max = parseInt($(e.target).attr("max")) || 2;
+            
+            // Жесткие лимиты: не меньше 2, не больше размера чата
+            if (val < 2) val = 2;
+            if (val > max) val = max;
+            
+            $(e.target).val(val);
+            extension_settings[extensionName].skipCount = val;
             saveSettingsDebounced();
         });
 
@@ -138,6 +169,9 @@ jQuery(async () => {
        
         loadSettings();
         eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, handleChatEvent);
+        
+        // Обновляем max лимит при каждом новом сообщении
+        eventSource.on(event_types.MESSAGE_RECEIVED, updateMaxSkip);
         
         console.log(`[${extensionName}] ✅ Full Control Loaded`);
     } catch (error) {
