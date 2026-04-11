@@ -34,14 +34,14 @@ Look for "Facts Memory Tracker" in the list of extensions in SillyTavern.
 
 Extensions with similar functionality that I’ve seen:
 
-- https://github.com/Kristyku/InlineSummary
+1. https://github.com/Kristyku/InlineSummary
 
-- https://github.com/KiskaSora/SillyTavern-Horae.git
+2. https://github.com/KiskaSora/SillyTavern-Horae.git
 
-- https://github.com/smoksshit-cmd/FactsMemoryTracker
+3. https://github.com/smoksshit-cmd/FactsMemoryTracker
 
-- https://github.com/smoksshit-cmd/SecretsRevelationsTracker
-- </details>
+ 4. https://github.com/smoksshit-cmd/SecretsRevelationsTracker
+</details>
 
 ## Прочти меня
 
@@ -75,10 +75,10 @@ Extensions with similar functionality that I’ve seen:
 
 Расширениями с похожим функционалом, которые мне встречались:
 
-- https://github.com/Kristyku/InlineSummary
+1. https://github.com/Kristyku/InlineSummary
 
-- https://github.com/KiskaSora/SillyTavern-Horae.git
+2. https://github.com/KiskaSora/SillyTavern-Horae.git
 
-- https://github.com/smoksshit-cmd/FactsMemoryTracker
+3. https://github.com/smoksshit-cmd/FactsMemoryTracker
 
-- https://github.com/smoksshit-cmd/SecretsRevelationsTracker
+4. https://github.com/smoksshit-cmd/SecretsRevelationsTracker
