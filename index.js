@@ -1,5 +1,3 @@
-САМЫЙ НОВЫЙ ИНДЕКС
-
 import { extension_settings, getContext } from "../../../extensions.js";
 import { saveSettingsDebounced, eventSource, event_types } from "../../../../script.js";
 
