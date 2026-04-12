@@ -75,54 +75,59 @@ async function runAutoScan() {
     if (!chat || chat.length <= skipCount) return;
 
     const endIndex = chat.length - skipCount;
-    let targetText = "";
+    const messagesToScan = [];
 
+    // 2.1.1 Собираем список сообщений для анализа
     for (let i = 0; i < endIndex; i++) {
         if (chat[i] && chat[i].mes) {
             const speaker = chat[i].is_user ? "User" : (chat[i].name || "Character");
-            targetText += `${speaker}: ${chat[i].mes}\n`;
+            messagesToScan.push({
+                speaker: speaker,
+                text: chat[i].mes
+            });
         }
     }
 
-    if (targetText.trim() === "") return;
-
-    const promptText = `TASK: Extract facts ONLY from the "NEW CHAT DATA" provided below. 
-STRICT RULES:
-1. Ignore any previous knowledge about the character.
-2. Use ONLY information explicitly mentioned in the text below.
-3. Respond with complete, finished sentences.
-4. If multiple facts are found, put each on a NEW LINE.
-5. If no new facts are found, respond with "No new facts".
-
-NEW CHAT DATA:
-${targetText}`;
+    if (messagesToScan.length === 0) return;
 
     try {
-        const response = await window.SillyTavern.getContext().generateRaw({
-            prompt: promptText,
-            text: promptText 
-        });
-        
-        if (response) {
-            // Разрезаем ответ по строкам, чтобы каждый факт стал отдельной карточкой
-            const lines = response.split('\n');
-            
-            lines.forEach(line => {
-                const cleanFact = line.replace(/^\d+\.\s*/, '').trim(); // Убираем "1. ", если ИИ пронумеровал
-                
-                if (cleanFact.length > 5 && 
-                    !cleanFact.toLowerCase().includes("no new facts") && 
-                    !cleanFact.toLowerCase().includes("no information")) {
-                    
-                    extension_settings[extensionName].facts.push(cleanFact);
-                }
+        // 2.1.2 Создаем массив "обещаний" (запросов)
+        const promises = messagesToScan.map(async (msg) => {
+            const promptText = `TASK: Extract important facts about the User or Character from this specific message.
+STRICT RULES:
+1. Use ONLY information from the message below.
+2. If multiple facts are found, combine them into one concise paragraph.
+3. If no new facts are found, respond exactly with: "No new facts".
+
+MESSAGE TO ANALYZE:
+${msg.speaker}: ${msg.text}`;
+
+            const response = await window.SillyTavern.getContext().generateRaw({
+                prompt: promptText,
+                text: promptText 
             });
 
-            saveSettingsDebounced();
-            renderFacts();
-        }
+            return response ? response.trim() : "No new facts";
+        });
+
+        // 2.1.3 Запускаем все запросы одновременно и ждем результат
+        const results = await Promise.all(promises);
+
+        // 2.1.4 Обрабатываем результаты (каждый результат — это один контейнер)
+        results.forEach(newFact => {
+            if (newFact.length > 5 && 
+                !newFact.toLowerCase().includes("no new facts") && 
+                !newFact.toLowerCase().includes("no information")) {
+                
+                extension_settings[extensionName].facts.push(newFact);
+            }
+        });
+
+        saveSettingsDebounced();
+        renderFacts();
+        
     } catch (error) {
-        console.error(`[${extensionName}] Ошибка сканирования:`, error);
+        console.error(`[${extensionName}] Ошибка параллельного сканирования:`, error);
     }
 }
 
