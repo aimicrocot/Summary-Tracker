@@ -10,7 +10,46 @@ const defaultSettings = {
     facts: [] 
 };
 
-// --- ФУНКЦИИ УПРАВЛЕНИЯ ---
+// --- ФУНКЦИИ ВИЗУАЛИЗАЦИИ И СКРЫТИЯ ---
+
+function applyVisualHiding() {
+    const chat = getContext().chat;
+    const skipCount = parseInt(extension_settings[extensionName].skipCount) || 2;
+    const facts = extension_settings[extensionName].facts;
+    const cutOffIndex = chat.length - skipCount;
+
+    // 1. Скрываем старые сообщения в DOM
+    $(".mes").each(function() {
+        const mesId = parseInt($(this).attr("mesid"));
+        if (mesId >= 0 && mesId < cutOffIndex) {
+            $(this).addClass("fmt-hidden-message");
+        } else {
+            $(this).removeClass("fmt-hidden-message");
+        }
+    });
+
+    // 2. Управляем блоком саммари в начале чата
+    $("#fmt_summary_in_chat").remove();
+    if (facts.length > 0 && cutOffIndex > 0) {
+        const summaryHtml = `
+            <div id="fmt_summary_in_chat" class="fmt-chat-summary-block">
+                <div class="fmt-summary-header">
+                    <span><i class="fa-solid fa-brain"></i> MEMORY TRACKER SUMMARY</span>
+                    <span>${facts.length} facts preserved</span>
+                </div>
+                <div class="fmt-summary-content">${facts.join(" ")}</div>
+                <div style="text-align: center; margin-top: 10px; font-size: 0.75em; opacity: 0.5;">(Нажми, чтобы временно развернуть историю)</div>
+            </div>`;
+        $("#chat").prepend(summaryHtml);
+        
+        $("#fmt_summary_in_chat").on("click", function() {
+            $(".fmt-hidden-message").removeClass("fmt-hidden-message");
+            $(this).fadeOut();
+        });
+    }
+}
+
+// --- ФУНКЦИИ УПРАВЛЕНИЯ ФАКТАМИ ---
 
 function deleteFact(index) {
     extension_settings[extensionName].facts.splice(index, 1);
@@ -22,7 +61,6 @@ function deleteFact(index) {
 function editFact(index) {
     const currentFact = extension_settings[extensionName].facts[index];
     const newFact = prompt("Редактирование факта:", currentFact);
-    
     if (newFact !== null && newFact.trim() !== "") {
         extension_settings[extensionName].facts[index] = newFact.trim();
         saveSettingsDebounced();
@@ -37,10 +75,10 @@ function renderFacts() {
 
     if (!facts || facts.length === 0) {
         listContainer.html('<small style="opacity:0.5;">Список пуст...</small>');
+        applyVisualHiding(); 
         return;
     }
 
-    // Твой любимый дизайн с инлайн-стилями
     let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
     facts.forEach((fact, index) => {
         html += `
@@ -55,29 +93,22 @@ function renderFacts() {
     html += '</div>';
     listContainer.html(html);
 
-    // Обработчики событий
-    $(".fmt-delete-btn").off("click").on("click", function() {
-        deleteFact($(this).data("index"));
-    });
+    $(".fmt-delete-btn").off("click").on("click", function() { deleteFact($(this).data("index")); });
+    $(".fmt-edit-btn").off("click").on("click", function() { editFact($(this).data("index")); });
 
-    $(".fmt-edit-btn").off("click").on("click", function() {
-        editFact($(this).data("index"));
-    });
+    applyVisualHiding();
 }
 
-// --- ЛОГИКА СКАНИРОВАНИЯ (БЕЗ ИЗМЕНЕНИЙ ФУНКЦИОНАЛА) ---
+// --- ЛОГИКА СКАНИРОВАНИЯ ---
 
 async function runAutoScan() {
     const context = getContext();
     const chat = context.chat;
     const skipCount = parseInt(extension_settings[extensionName].skipCount) || 2;
-
     if (!chat || chat.length <= skipCount) return;
 
     const endIndex = chat.length - skipCount;
     const messagesToScan = [];
-
-    // Собираем сообщения
     for (let i = 0; i < endIndex; i++) {
         if (chat[i] && chat[i].mes) {
             const speaker = chat[i].is_user ? "User" : (chat[i].name || "Character");
@@ -86,49 +117,23 @@ async function runAutoScan() {
     }
 
     if (messagesToScan.length === 0) return;
-
-    toastr.info(`Начинаю сканирование ${messagesToScan.length} сообщений... По одному.`, "Facts Tracker");
+    toastr.info(`Сканирование ${messagesToScan.length} сообщений...`, "Facts Tracker");
 
     try {
-        // Запускаем строгий последовательный цикл
-        for (let i = 0; i < messagesToScan.length; i++) {
-            const msg = messagesToScan[i];
-            
-            const promptText = `TASK: Extract important facts about the User or Character from THIS SPECIFIC message.
-STRICT RULES:
-1. Use ONLY information from the message below.
-2. If multiple facts are found, combine them into one concise paragraph.
-3. If no new facts are found, respond exactly with: "No new facts".
-
-MESSAGE:
-${msg.speaker}: ${msg.text}`;
-
-            // await внутри цикла останавливает выполнение до получения ответа
-            const response = await window.SillyTavern.getContext().generateRaw({
-                prompt: promptText,
-                text: promptText 
-            });
-
+        for (const msg of messagesToScan) {
+            const promptText = `TASK: Extract facts about User/Character. Concise paragraph. If none, reply "No new facts".\n\nMESSAGE: ${msg.speaker}: ${msg.text}`;
+            const response = await window.SillyTavern.getContext().generateRaw({ prompt: promptText });
             const newFact = response ? response.trim() : "No new facts";
 
-            // Если факт найден, сразу сохраняем
-            if (newFact.length > 5 && 
-                !newFact.toLowerCase().includes("no new facts") && 
-                !newFact.toLowerCase().includes("no information")) {
-                
+            if (newFact.length > 5 && !newFact.toLowerCase().includes("no new facts")) {
                 extension_settings[extensionName].facts.push(newFact);
-                
-                // Опционально: можно обновлять UI прямо в процессе, чтобы видеть прогресс
                 renderFacts();
             }
         }
-
         saveSettingsDebounced();
-        toastr.success("Сканирование успешно завершено!", "Facts Tracker");
-        
+        toastr.success("Готово!", "Facts Tracker");
     } catch (error) {
-        console.error(`[${extensionName}] Ошибка сканирования:`, error);
-        toastr.error("Процесс прерван из-за ошибки API.", "Facts Tracker");
+        console.error(`[${extensionName}] Error:`, error);
     }
 }
 
@@ -140,7 +145,7 @@ async function handleChatEvent() {
     }
 }
 
-// --- ИНИЦИАЛИЗАЦИЯ И ОБРАБОТЧИКИ ---
+// --- ИНИЦИАЛИЗАЦИЯ ---
 
 function updateMaxSkip() {
     const chatLength = getContext().chat?.length || 0;
@@ -152,13 +157,26 @@ function loadSettings() {
     if (Object.keys(extension_settings[extensionName]).length === 0) {
         Object.assign(extension_settings[extensionName], defaultSettings);
     }
-    
     $("#fmt_auto_scan").prop("checked", extension_settings[extensionName].autoScan);
     $("#fmt_skip_count").val(extension_settings[extensionName].skipCount || 2);
-    
     updateMaxSkip();
     renderFacts();
 }
+
+// Хук подмены контекста для ИИ (невидимый для юзера)
+eventSource.on(event_types.GENERATE_BEFORE_COMMANDS, async () => {
+    const context = getContext();
+    const skipCount = parseInt(extension_settings[extensionName].skipCount) || 2;
+    const facts = extension_settings[extensionName].facts;
+
+    if (facts.length > 0 && context.chat.length > skipCount) {
+        const cutOffIndex = context.chat.length - skipCount;
+        const factsSummary = "System Note: Key facts from previous conversation:\n" + facts.join("\n");
+        const summaryMessage = { is_user: false, is_system: true, mes: factsSummary };
+        const recentMessages = context.chat.slice(cutOffIndex);
+        context.chat = [summaryMessage, ...recentMessages];
+    }
+});
 
 jQuery(async () => {
     try {
@@ -171,21 +189,13 @@ jQuery(async () => {
         });
 
         $("#fmt_skip_count").on("input", (e) => {
-            let val = parseInt($(e.target).val());
-            const max = parseInt($(e.target).attr("max")) || 2;
-            if (val < 2) val = 2;
-            if (val > max) val = max;
-            $(e.target).val(val);
+            let val = parseInt($(e.target).val()) || 2;
             extension_settings[extensionName].skipCount = val;
             saveSettingsDebounced();
+            applyVisualHiding();
         });
 
-        $("#fmt_manual_scan").on("click", async () => {
-            toastr.info("Сканирую...");
-            await runAutoScan();
-            toastr.success("Готово!");
-        });
-
+        $("#fmt_manual_scan").on("click", runAutoScan);
         $("#fmt_clear_facts").on("click", () => {
             if (confirm("Очистить всё?")) {
                 extension_settings[extensionName].facts = [];
@@ -195,8 +205,12 @@ jQuery(async () => {
         });
        
         loadSettings();
-        eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, handleChatEvent);
+        eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, (async () => {
+            await handleChatEvent();
+            applyVisualHiding();
+        }));
         eventSource.on(event_types.MESSAGE_RECEIVED, updateMaxSkip);
+        eventSource.on(event_types.CHAT_COMPLETED, applyVisualHiding);
         
         console.log(`[${extensionName}] ✅ Full Control Loaded`);
     } catch (error) {
