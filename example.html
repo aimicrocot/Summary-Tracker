@@ -10,9 +10,19 @@
                 <label for="fmt_auto_scan">Включить авто-сканирование</label>
             </div>
             
-            <div class="flex-container" style="margin-top: 10px;">
-                <label for="fmt_skip_count" style="margin-right: 10px;">Пропускать сообщений (минимум 2):</label>
-                <input id="fmt_skip_count" type="number" min="2" style="width: 60px;" />
+            <div class="flex-container" style="margin-top: 10px; display: flex; align-items: center;">
+    <label for="fmt_skip_count" style="margin-right: 10px;">Пропускать сообщений (минимум 2):</label>
+    <input id="fmt_skip_count" 
+           class="text_bg" 
+           type="number" 
+           min="2" 
+           style="width: 60px; 
+                  color: var(--text-color); 
+                  background-color: var(--input-bg-color); 
+                  border: 1px solid rgba(255,255,255,0.2); 
+                  border-radius: 4px; 
+                  padding: 2px; 
+                  text-align: center;" />
             </div>
             
             <hr />
