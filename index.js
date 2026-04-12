@@ -40,16 +40,17 @@ function renderFacts() {
         return;
     }
 
-    // Создаем контейнер-список
-    let html = '<div class="fmt-list-container">';
+    // Использование flex-column и gap для создания структуры карточек как на скриншотах
+    let html = '<div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">';
     
     facts.forEach((fact, index) => {
+        // Каждый факт оборачивается в отдельный контейнер с рамкой и фоном
         html += `
-            <div class="fmt-fact-item">
-                <div class="fmt-fact-text">${fact}</div>
-                <div class="fmt-fact-controls">
-                    <i class="fa-solid fa-pen-to-square fmt-edit-btn" data-index="${index}" title="Редактировать"></i>
-                    <i class="fa-solid fa-trash fmt-delete-btn" data-index="${index}" title="Удалить"></i>
+            <div class="fmt-fact-item" style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); padding: 10px 15px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                <div class="fmt-fact-text" style="font-size: 0.95em; color: #e0e0e0; flex-grow: 1; margin-right: 15px; line-height: 1.4;">${fact}</div>
+                <div style="display: flex; gap: 12px; flex-shrink: 0; align-items: center;">
+                    <i class="fa-solid fa-pen-to-square fmt-edit-btn" data-index="${index}" style="cursor: pointer; color: #4a9eff; font-size: 1.1em;" title="Редактировать"></i>
+                    <i class="fa-solid fa-trash fmt-delete-btn" data-index="${index}" style="cursor: pointer; color: #ff5555; font-size: 1.1em;" title="Удалить"></i>
                 </div>
             </div>`;
     });
@@ -57,7 +58,7 @@ function renderFacts() {
     html += '</div>';
     listContainer.html(html);
 
-    // Обработчики событий
+    // Обработчики событий для кнопок внутри карточек
     $(".fmt-delete-btn").off("click").on("click", function() {
         deleteFact($(this).data("index"));
     });
@@ -92,9 +93,8 @@ async function runAutoScan() {
 STRICT RULES:
 1. Ignore any previous knowledge about the character.
 2. Use ONLY information explicitly mentioned in the text below.
-3. Respond with complete, finished sentences.
-4. If multiple facts are found, put each on a NEW LINE.
-5. If no new facts are found, respond with "No new facts".
+3. Respond with complete, finished sentences. Do not cut off the text.
+4. If no new facts are found, respond with "No new facts".
 
 NEW CHAT DATA:
 ${targetText}`;
@@ -106,24 +106,15 @@ ${targetText}`;
         });
         
         if (response) {
-            // 1.2 РАЗДЕЛЕНИЕ ОТВЕТА: Разрезаем текст по переносу строки
-            const lines = response.split('\n');
-            
-            lines.forEach(line => {
-                // 1.3 ОЧИСТКА: Убираем лишние пробелы и возможную нумерацию (типа "1. ")
-                const cleanFact = line.replace(/^\d+\.\s*/, '').trim();
+            const newFact = response.trim();
+            if (newFact.length > 5 && 
+                !newFact.toLowerCase().includes("no new facts") && 
+                !newFact.toLowerCase().includes("no information")) {
                 
-                // 1.4 ПРОВЕРКА: Сохраняем только если это не отказ ИИ и строка не пустая
-                if (cleanFact.length > 5 && 
-                    !cleanFact.toLowerCase().includes("no new facts") && 
-                    !cleanFact.toLowerCase().includes("no information")) {
-                    
-                    extension_settings[extensionName].facts.push(cleanFact);
-                }
-            });
-            
-            saveSettingsDebounced();
-            renderFacts();
+                extension_settings[extensionName].facts.push(newFact);
+                saveSettingsDebounced();
+                renderFacts();
+            }
         }
     } catch (error) {
         console.error(`[${extensionName}] Ошибка сканирования:`, error);
