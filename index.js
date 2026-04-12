@@ -92,8 +92,9 @@ async function runAutoScan() {
 STRICT RULES:
 1. Ignore any previous knowledge about the character.
 2. Use ONLY information explicitly mentioned in the text below.
-3. Respond with complete, finished sentences. Do not cut off the text.
-4. If no new facts are found, respond with "No new facts".
+3. Respond with complete, finished sentences.
+4. If multiple facts are found, put each on a NEW LINE.
+5. If no new facts are found, respond with "No new facts".
 
 NEW CHAT DATA:
 ${targetText}`;
@@ -105,15 +106,24 @@ ${targetText}`;
         });
         
         if (response) {
-            const newFact = response.trim();
-            if (newFact.length > 5 && 
-                !newFact.toLowerCase().includes("no new facts") && 
-                !newFact.toLowerCase().includes("no information")) {
+            // 1.2 РАЗДЕЛЕНИЕ ОТВЕТА: Разрезаем текст по переносу строки
+            const lines = response.split('\n');
+            
+            lines.forEach(line => {
+                // 1.3 ОЧИСТКА: Убираем лишние пробелы и возможную нумерацию (типа "1. ")
+                const cleanFact = line.replace(/^\d+\.\s*/, '').trim();
                 
-                extension_settings[extensionName].facts.push(newFact);
-                saveSettingsDebounced();
-                renderFacts();
-            }
+                // 1.4 ПРОВЕРКА: Сохраняем только если это не отказ ИИ и строка не пустая
+                if (cleanFact.length > 5 && 
+                    !cleanFact.toLowerCase().includes("no new facts") && 
+                    !cleanFact.toLowerCase().includes("no information")) {
+                    
+                    extension_settings[extensionName].facts.push(cleanFact);
+                }
+            });
+            
+            saveSettingsDebounced();
+            renderFacts();
         }
     } catch (error) {
         console.error(`[${extensionName}] Ошибка сканирования:`, error);
