@@ -28,7 +28,7 @@ A minimalist extension that allows hiding messages from the context and summariz
 
 ### Testing
 
-Look for "Facts Memory Tracker" in the list of extensions in SillyTavern.
+Look for extension in the list of extensions in SillyTavern.
 
 ### Inspired by
 
@@ -69,7 +69,7 @@ Extensions with similar functionality that I’ve seen:
 
 ### Тестирование
 
-Найдите "Facts Memory Tracker" в списке расширений в SillyTavern.
+Найдите название расширения в списке расширений в SillyTavern.
 
 ### Вдохновлено
 
