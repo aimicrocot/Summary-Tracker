@@ -121,7 +121,7 @@ async function runAutoScan() {
 
     try {
         for (const msg of messagesToScan) {
-            const promptText = `TASK: Extract facts about characters: {{user}}, {{char}}, NPCs. Write a concise paragraph. Always write your fact summary in the language used in {{user}}'s messages. If none, reply: "No new facts".\n\nMESSAGE: ${msg.speaker}: ${msg.text}`;
+            const promptText = `TASK: Extract facts about characters: {{user}}, {{char}}, other characters. So write a concise paragraph about important facts. Always write your fact summary in the language used in {{user}}'s messages. If none, reply: "No new facts".\n\nMESSAGE: ${msg.speaker}: ${msg.text}`;
             const response = await window.SillyTavern.getContext().generateRaw({ prompt: promptText });
             const newFact = response ? response.trim() : "No new facts";
 
