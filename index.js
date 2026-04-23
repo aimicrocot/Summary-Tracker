@@ -39,8 +39,8 @@ function applyVisualHiding() {
                 </div>
                 
                 <div style="display: flex; gap: 20px; justify-content: center; margin-top: 10px;">
-                    <button id="fmt_btn_toggle_text" style="background: transparent; border: 1px dashed #4a9eff; color: #4a9eff; padding: 8px 16px; border-radius: 5px; cursor: pointer; white-space: nowrap;">Показать саммари</button>
-                    <button id="fmt_btn_show_history" style="background: transparent; border: 1px dashed #4a9eff; color: #4a9eff; padding: 8px 16px; border-radius: 5px; cursor: pointer; white-space: nowrap;">Развернуть историю</button>
+                    <button id="fmt_btn_toggle_text" style="background: transparent; border: 1px dashed #4a9eff; color: #4a9eff; padding: 8px 16px; border-radius: 5px; cursor: pointer; white-space: nowrap;">Саммари</button>
+                    <button id="fmt_btn_show_history" style="background: transparent; border: 1px dashed #4a9eff; color: #4a9eff; padding: 8px 16px; border-radius: 5px; cursor: pointer; white-space: nowrap;">Сообщения</button>
                 </div>
                 </div>
 
