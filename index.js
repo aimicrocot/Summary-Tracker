@@ -56,9 +56,16 @@ function applyVisualHiding() {
         });
 
         // Обработчик для второй кнопки: разворачиваем историю чата
+        // Обработчик для второй кнопки: разворачиваем/сворачиваем историю чата
         $("#fmt_btn_show_history").on("click", function() {
-            $(".fmt-hidden-message").removeClass("fmt-hidden-message");
-            $("#fmt_summary_in_chat").fadeOut();
+            // Проверяем, есть ли сейчас скрытые сообщения
+            if ($(".fmt-hidden-message").length > 0) {
+                // Если есть — показываем их, заменяя оригинальный класс на временный
+                $(".fmt-hidden-message").removeClass("fmt-hidden-message").addClass("fmt-temp-show");
+            } else {
+                // Если скрытых сообщений нет (мы их уже развернули) — возвращаем скрывающий класс обратно
+                $(".fmt-temp-show").removeClass("fmt-temp-show").addClass("fmt-hidden-message");
+            }
         });
     }
 }
