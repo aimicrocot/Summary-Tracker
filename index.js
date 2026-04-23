@@ -146,7 +146,7 @@ async function runAutoScan() {
             }
         }
         saveSettingsDebounced();
-        toastr.success("Готово!", "Facts Tracker");
+        toastr.success("Готово!", "Summary Tracker");
     } catch (error) {
         console.error(`[${extensionName}] Error:`, error);
     }
