@@ -32,15 +32,10 @@ Look for extension in the list of extensions in SillyTavern.
 
 ### Inspired by
 
-Extensions with similar functionality that I’ve seen:
+Extension with similar functionality that I’ve seen:
 
-1. https://github.com/Kristyku/InlineSummary
+https://github.com/Kristyku/InlineSummary
 
-2. https://github.com/KiskaSora/SillyTavern-Horae.git
-
-3. https://github.com/smoksshit-cmd/FactsMemoryTracker
-
- 4. https://github.com/smoksshit-cmd/SecretsRevelationsTracker
 </details>
 
 ## Прочти меня
@@ -73,12 +68,6 @@ Extensions with similar functionality that I’ve seen:
 
 ### Вдохновлено
 
-Расширениями с похожим функционалом, которые мне встречались:
+Расширенияме с похожим функционалом, которое мне встретилось:
 
-1. https://github.com/Kristyku/InlineSummary
-
-2. https://github.com/KiskaSora/SillyTavern-Horae.git
-
-3. https://github.com/smoksshit-cmd/FactsMemoryTracker
-
-4. https://github.com/smoksshit-cmd/SecretsRevelationsTracker
+https://github.com/Kristyku/InlineSummary
