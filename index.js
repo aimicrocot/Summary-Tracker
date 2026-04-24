@@ -156,6 +156,9 @@ async function runAutoScan() {
         }
         saveSettingsDebounced();
         toastr.success("Готово!", "Summary Tracker");
+        extension_settings[extensionName].isHidden = true;
+        $("#fmt_toggle_hide").val("Вернуть");
+        applyVisualHiding();
     } catch (error) {
         console.error(`[${extensionName}] Error:`, error);
     }
