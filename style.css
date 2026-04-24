@@ -1,0 +1,31 @@
+.fmt-hidden-message {
+    display: none !important;
+}
+.fmt-chat-summary-block {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px dashed 
+#4a9eff;
+    padding: 15px;
+    margin: 10px 5px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.fmt-chat-summary-block:hover {
+    background: rgba(74, 158, 255, 0.1);
+}
+.fmt-summary-header {
+    font-weight: bold;
+    color: 
+#4a9eff;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85em;
+}
+.fmt-summary-content {
+    font-size: 0.9em;
+    line-height: 1.4;
+    font-style: italic;
+    opacity: 0.9;
+}
