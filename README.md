@@ -4,37 +4,39 @@
 
 <details>
 
-### About
-  
-A minimalist extension that allows hiding messages from the context and summarizing their essence, sending only the most important information to the chat context to save tokens (work in progress). Designed for max token/cost savings during RP, extending API key lifespan, and preserving context coherence.
+### About the Extension
+
+A minimalist extension that hides messages from the context and extracts their essence, sending only the most important information into the chat context. It is designed to maximize token/cost efficiency, extend API key lifespan, and maintain context coherence during roleplay.
 
 ### Features
 
-- You control how many of the most recent messages remain visible; at minimum, this includes the latest message from the bot and the user
-- All other messages are automatically hidden, and their key points are also extracted automatically—no manual selection required
-- The process runs in parallel, meaning it does not affect the model’s intelligence
-- There are no additional injections or token overhead—only a concise summary of past messages
-- There is an option to manually scan messages via a button.
+* You control how many of the most recent messages remain visible; at minimum, the latest message from both the bot and the user
+* All other messages can be hidden by pressing the "Hide" button, and their essence is collected by pressing the "Scan" button—no need to select messages manually
+* The process is designed so it does not affect the model’s intelligence
+* No additional injections or token usage for anything else—only scanning and concise summarization of messages
+* Option to automatically scan every 4 messages
+* Uses your current model that you are roleplaying with
 
 ### Installation
 
 1. Open SillyTavern
 
-2. Go to the Extensions → Install Extension
+2. Go to Extensions → Install Extension
 
 3. Paste the link to this GitHub repository
 
 4. Refresh the SillyTavern page (F5)
 
-### Testing
+### Usage
 
-Look for extension in the list of extensions in SillyTavern.
+Find the extension name in the list of extensions in SillyTavern.
 
 ### Inspired by
 
-Extension with similar functionality that I’ve seen:
+An extension with similar functionality that I came across:
 
-https://github.com/Kristyku/InlineSummary
+[https://github.com/Kristyku/InlineSummary](https://github.com/Kristyku/InlineSummary)
+
 
 </details>
 
@@ -42,15 +44,16 @@ https://github.com/Kristyku/InlineSummary
 
 ### О расширении
 
-Минималистичное расширение, которое позволяет скрывать сообщения из контекста и вытаскивать их суть, отправляя в контекст чата только самую важную информацию (в разработке). Создано для максимальной экономии токенов/денег во время РП, продления жизни api-ключей и сохранения связности контекста.
+Минималистичное расширение, которое скрывает сообщения из контекста и вытаскивать их суть, отправляя в контекст чата только самую важную информацию. Нужно для максимальной экономии токенов/денег, продления жизни API-ключей и сохранения связности контекста во время РП.
 
 ### Особенности
 
 - Вы контролируете число последних сообщений, которые не скрываются; минимально это последнее сообщение бота и юзера
-- Остальные сообщения скрываются автоматически, и суть из них собирается тоже автоматически, их не надо выбирать вручную
-- Процесс проходит параллельно, то есть построен так, что не влияет на интеллект модели
+- Остальные сообщения скрываются при нажатии на кнопку "Скрыть", и суть из них собирается при нажатии на кнопку "Сканировать", сообщения не надо выбирать вручную
+- Процесс построен так, что не влияет на интеллект модели
 - Нет никаких дополнительных инжектов или траты токенов на что-то ещё, только сканирование и краткое саммари сообщений
-- Есть возможность ручного скана через кнопку
+- Есть возможность автоматического скана каждые 4 сообщения
+- Используется ваша текущая модель, с которой вы в РП
 
 ### Установка
 
@@ -62,7 +65,7 @@ https://github.com/Kristyku/InlineSummary
 
 4. Обновите страницу SillyTavern (F5)
 
-### Тестирование
+### Использование
 
 Найдите название расширения в списке расширений в SillyTavern.
 
