@@ -8,10 +8,27 @@ const defaultSettings = {
     autoScan: false,
     skipCount: 2,
     isHidden: false,
-    facts: [] 
+    factsByChatId: {} 
 };
 
 let hiddenMessagesBuffer = [];
+
+function getCurrentChatId() {
+    const context = getContext();
+    return context.chatId || null;
+}
+
+function getCurrentFacts() {
+    const chatId = getCurrentChatId();
+    if (!chatId) return [];
+    return extension_settings[extensionName].factsByChatId[chatId] || [];
+}
+
+function setCurrentFacts(facts) {
+    const chatId = getCurrentChatId();
+    if (!chatId) return;
+    extension_settings[extensionName].factsByChatId[chatId] = facts;
+}
 
 // --- ФУНКЦИИ ВИЗУАЛИЗАЦИИ И СКРЫТИЯ ---
 
@@ -150,7 +167,9 @@ async function runAutoScan() {
             const newFact = response ? response.trim() : "No new facts";
 
             if (newFact.length > 5 && !newFact.toLowerCase().includes("no new facts")) {
-                extension_settings[extensionName].facts.push(newFact);
+                const facts = getCurrentFacts();
+                facts.push(newFact);
+                setCurrentFacts(facts);
                 renderFacts();
             }
         }
@@ -185,6 +204,9 @@ function loadSettings() {
     if (Object.keys(extension_settings[extensionName]).length === 0) {
         Object.assign(extension_settings[extensionName], defaultSettings);
     }
+    if (!extension_settings[extensionName].factsByChatId) {
+        extension_settings[extensionName].factsByChatId = {};
+    }
     if (extension_settings[extensionName].isHidden === undefined) {
         extension_settings[extensionName].isHidden = false;
     }
@@ -215,7 +237,7 @@ jQuery(async () => {
         $("#fmt_manual_scan").on("click", runAutoScan);
         $("#fmt_clear_facts").on("click", () => {
             if (confirm("Очистить всё?")) {
-                extension_settings[extensionName].facts = [];
+                setCurrentFacts([]);
                 saveSettingsDebounced();
                 renderFacts();
             }
@@ -253,6 +275,10 @@ jQuery(async () => {
 
         eventSource.on(event_types.MESSAGE_RECEIVED, updateMaxSkip);
         eventSource.on(event_types.CHAT_COMPLETED, applyVisualHiding);
+        eventSource.on(event_types.CHAT_CHANGED, () => {
+            renderFacts();
+            applyVisualHiding();
+        });
         
         console.log(`[${extensionName}] ✅ Full Control Loaded`);
     } catch (error) {
