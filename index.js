@@ -55,7 +55,7 @@ function applyVisualHiding() {
     } else {
         context.extension_prompt = "";
     }
-
+}
 // --- ФУНКЦИИ УПРАВЛЕНИЯ ФАКТАМИ ---
 
 function deleteFact(index) {
