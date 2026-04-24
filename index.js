@@ -7,7 +7,7 @@ const extensionFolderPath = `scripts/extensions/third-party/${extensionName}`;
 const defaultSettings = {
     autoScan: false,
     skipCount: 2,
-    isHidden: false,
+    isHidden: true,
     facts: [] 
 };
 
@@ -185,7 +185,7 @@ function loadSettings() {
     $("#fmt_skip_count").val(extension_settings[extensionName].skipCount || 2);
     updateMaxSkip();
     renderFacts();
-    $("#fmt_toggle_hide").val(extension_settings[extensionName].isHidden ? "Вернуть" : "Скрыть");
+    $("#fmt_toggle_hide").val(extension_settings[extensionName].isHidden ? "Скрыть" : "Вернуть");
 }
 
 jQuery(async () => {
@@ -218,7 +218,7 @@ jQuery(async () => {
             const isHidden = !extension_settings[extensionName].isHidden;
             extension_settings[extensionName].isHidden = isHidden;
             saveSettingsDebounced();
-            $("#fmt_toggle_hide").val(isHidden ? "Вернуть" : "Скрыть");
+            $("#fmt_toggle_hide").val(isHidden ? "Скрыть" : "Вернуть");
             applyVisualHiding();
         });
        
