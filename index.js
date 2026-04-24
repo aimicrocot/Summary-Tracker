@@ -13,10 +13,6 @@ const defaultSettings = {
 
 let hiddenMessagesBuffer = [];
 
-const style = document.createElement("style");
-style.textContent = `.fmt-hidden-message { display: none !important; }`;
-document.head.appendChild(style);
-
 function getCurrentChatId() {
     const context = getContext();
     return context.chatId || null;
