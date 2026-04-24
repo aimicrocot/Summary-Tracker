@@ -36,9 +36,7 @@ My Telegram-channel: [@sillytavern1](https://t.me/sillytavern1)
 
 ### Inspired by
 
-An extension with similar functionality that I came across:
-
-[https://github.com/Kristyku/InlineSummary](https://github.com/Kristyku/InlineSummary)
+An extension with similar functionality that I came across: [https://github.com/Kristyku/InlineSummary](https://github.com/Kristyku/InlineSummary)
 
 
 </details>
@@ -77,6 +75,4 @@ An extension with similar functionality that I came across:
 
 ### Вдохновлено
 
-Расширенияме с похожим функционалом, которое мне встретилось:
-
-https://github.com/Kristyku/InlineSummary
+Встретившееся расширение с похожим функционалом: https://github.com/Kristyku/InlineSummary
