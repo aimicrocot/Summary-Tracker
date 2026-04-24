@@ -91,7 +91,7 @@ function renderFacts() {
     const facts = getCurrentFacts();
 
     if (!facts || facts.length === 0) {
-        listContainer.html('<small style="opacity:0.5;">Список пуст...</small>');
+        listContainer.html('<small style="opacity:0.5;">Пусто...</small>');
         applyVisualHiding(); 
         return;
     }
@@ -123,7 +123,7 @@ function renderSummary() {
     const facts = getCurrentFacts();
 
     if (!facts || facts.length === 0) {
-        container.html('<small style="opacity:0.5;">Список пуст...</small>');
+        container.html('<small style="opacity:0.5;">Пусто...</small>');
         return;
     }
 
