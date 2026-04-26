@@ -56,13 +56,13 @@ function applyVisualHiding() {
     const facts = getCurrentFacts();
     const cutOffIndex = chat.length - skipCount;
 
-    const shouldHide = extension_settings[extensionName].isHidden;
+   const shouldHide = extension_settings[extensionName].isHidden;
     $(".mes").each(function() {
         const mesId = parseInt($(this).attr("mesid"));
         if (shouldHide && mesId >= 0 && mesId < cutOffIndex) {
-            $(this).addClass("fmt-hidden-message");
+            $(this).attr("is_system", "true");
         } else {
-            $(this).removeClass("fmt-hidden-message");
+            $(this).attr("is_system", "false");
         }
     });
 
