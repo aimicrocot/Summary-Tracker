@@ -240,7 +240,7 @@ function loadSettings() {
     updateMaxSkip();
     renderFacts();
     renderSummary();
-    $("#fmt_toggle_hide").val(extension_settings[extensionName].isHidden ? "Return" : "Hide");
+    $("#fmt_toggle_hide").val(extension_settings[extensionName].isHidden ? "Show" : "Hide");
 }
 
 jQuery(async () => {
@@ -274,7 +274,7 @@ jQuery(async () => {
             const isHidden = !extension_settings[extensionName].isHidden;
             extension_settings[extensionName].isHidden = isHidden;
             saveSettingsDebounced();
-            $("#fmt_toggle_hide").val(isHidden ? "Return" : "Hide");
+            $("#fmt_toggle_hide").val(isHidden ? "Show" : "Hide");
             applyVisualHiding();
         });
        
