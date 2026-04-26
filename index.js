@@ -8,8 +8,7 @@ const defaultSettings = {
     autoScan: false,
     skipCount: 2,
     isHidden: false,
-    factsByChatId: {},
-    lastScannedByChatId: {}
+    factsByChatId: {} 
 };
 
 let hiddenMessagesBuffer = [];
@@ -33,18 +32,6 @@ function setCurrentFacts(facts) {
     const chatId = getCurrentChatId();
     if (!chatId) return;
     extension_settings[extensionName].factsByChatId[chatId] = facts;
-}
-
-function getLastScanned() {
-    const chatId = getCurrentChatId();
-    if (!chatId) return 0;
-    return extension_settings[extensionName].lastScannedByChatId[chatId] || 0;
-}
-
-function setLastScanned(index) {
-    const chatId = getCurrentChatId();
-    if (!chatId) return;
-    extension_settings[extensionName].lastScannedByChatId[chatId] = index;
 }
 
 // --- ФУНКЦИИ ВИЗУАЛИЗАЦИИ И СКРЫТИЯ ---
@@ -185,19 +172,15 @@ async function runAutoScan() {
     if (!chat || chat.length <= skipCount) return;
 
     const endIndex = chat.length - skipCount;
-    const startIndex = getLastScanned();
     const messagesToScan = [];
-    for (let i = startIndex; i < endIndex; i++) {
+    for (let i = 0; i < endIndex; i++) {
         if (chat[i] && chat[i].mes) {
             const speaker = chat[i].is_user ? "User" : (chat[i].name || "Character");
             messagesToScan.push({ speaker, text: chat[i].mes });
         }
     }
 
-    if (messagesToScan.length === 0) {
-        toastr.info("No new messages to scan", "Facts Tracker");
-        return;
-    }
+    if (messagesToScan.length === 0) return;
     toastr.info(`Сканирование ${messagesToScan.length} сообщений...`, "Facts Tracker");
 
     try {
@@ -215,7 +198,6 @@ async function runAutoScan() {
                 renderSummary();
             }
         }
-        setLastScanned(endIndex);
         saveSettingsDebounced();
         toastr.success("Готово!", "Summary Tracker");
     } catch (error) {
@@ -250,9 +232,6 @@ function loadSettings() {
     if (!extension_settings[extensionName].factsByChatId) {
         extension_settings[extensionName].factsByChatId = {};
     }
-    if (!extension_settings[extensionName].lastScannedByChatId) {
-        extension_settings[extensionName].lastScannedByChatId = {};
-    }
     if (extension_settings[extensionName].isHidden === undefined) {
         extension_settings[extensionName].isHidden = false;
     }
@@ -285,7 +264,6 @@ jQuery(async () => {
         $("#fmt_clear_facts").on("click", () => {
             if (confirm("Очистить всё?")) {
                 setCurrentFacts([]);
-                setLastScanned(0);
                 saveSettingsDebounced();
                 renderFacts();
                 renderSummary();
