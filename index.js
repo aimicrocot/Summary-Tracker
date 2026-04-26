@@ -231,7 +231,7 @@ async function runAutoScan() {
 async function handleChatEvent() {
     if (!extension_settings[extensionName].autoScan) return;
     const chat = getContext().chat;
-    if (chat && chat.length > 0 && chat.length % 4 === 0) {
+    if (chat && chat.length > 0) {
         await runAutoScan();
         extension_settings[extensionName].isHidden = true;
         saveSettingsDebounced();
