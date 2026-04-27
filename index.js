@@ -49,22 +49,27 @@ function applyVisualHiding() {
     const skipCount = parseInt(extension_settings[extensionName].skipCount) || 2;
     const facts = getCurrentFacts();
     const cutOffIndex = chat.length - skipCount;
+    const shouldHide = extension_settings[extensionName].isHidden;
 
-   const shouldHide = extension_settings[extensionName].isHidden;
+    // Расставляем нашу пометку extra.fmt_skip — не трогаем extra.skip (это призрак пользователя)
+    for (let i = 0; i < chat.length; i++) {
+        if (!chat[i].extra) chat[i].extra = {};
+        chat[i].extra.fmt_skip = (shouldHide && i < cutOffIndex);
+    }
+
+    // Визуальное скрытие через CSS — не трогаем атрибут is_system (это тоже механизм призрака)
     $(".mes").each(function() {
         const mesId = parseInt($(this).attr("mesid"));
         if (shouldHide && mesId >= 0 && mesId < cutOffIndex) {
-            $(this).attr("is_system", "true");
-            if (context.chat[mesId] && context.chat[mesId].extra) context.chat[mesId].extra.skip = true;
+            $(this).css("display", "none");
         } else {
-            $(this).attr("is_system", "false");
-            if (context.chat[mesId] && context.chat[mesId].extra) context.chat[mesId].extra.skip = false;
+            $(this).css("display", "");
         }
     });
 
     if (facts.length > 0 && cutOffIndex > 0) {
         const factsSummary = "### System Note: Key facts from previous conversation:\n" + facts.join("\n");
-        context.extension_prompt = factsSummary; 
+        context.extension_prompt = factsSummary;
     } else {
         context.extension_prompt = "";
     }
