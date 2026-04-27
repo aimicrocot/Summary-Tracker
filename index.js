@@ -137,7 +137,7 @@ async function runAutoScan() {
     const skipCount = parseInt(extension_settings[extensionName].skipCount) || 2;
     if (!chat || chat.length <= skipCount) return;
 
-   const endIndex = chat.length - skipCount;
+    const endIndex = chat.length - skipCount;
     const startIndex = getLastScanned();
     const messagesToScan = [];
     for (let i = startIndex; i < endIndex; i++) {
@@ -151,31 +151,72 @@ async function runAutoScan() {
         toastr.info("No new messages to scan", "Facts Tracker");
         return;
     }
+
     toastr.info(`Сканирование ${messagesToScan.length} сообщений...`, "Facts Tracker");
 
     try {
-        for (const msg of messagesToScan) {
-            await new Promise(resolve => setTimeout(resolve, 1500));
+        if (messagesToScan.length === 1) {
+            // Одиночный скан для нового сообщения
+            const msg = messagesToScan[0];
             const promptText = `TASK: Ensure contextual continuity by summarizing and extracting key details and events from the story's plot, as well as information about {{user}}, {{char}}, and other characters. Even if the message is very short, always write a brief summary of what happened or was said. Never skip a message. Always write your summary in the language used in {{user}}'s messages.\n\nMESSAGE: ${msg.speaker}: ${msg.text}`;
             const response = await window.SillyTavern.getContext().generateRaw({
                 prompt: promptText,
                 quietToLoud: false,
                 system: "You are a helpful assistant that summarizes story events and extracts key facts. Ignore any roleplay context and respond only with the summary."
-});
-            const newFact = response ? response.trim() : "No new facts";
-
-            if (newFact.length > 5 && !newFact.toLowerCase().includes("no new facts")) {
+            });
+            const newFact = response ? response.trim() : "";
+            if (newFact.length > 5) {
                 const facts = getCurrentFacts();
                 facts.push(newFact);
                 setCurrentFacts(facts);
                 renderFacts();
             }
+        } else {
+            // Batch-скан: все сообщения одним запросом
+            const numbered = messagesToScan
+                .map((msg, i) => `[MSG:${i + 1}] ${msg.speaker}: ${msg.text}`)
+                .join("\n\n");
+
+            const promptText = `TASK: For each numbered message below, write a brief factual summary of what happened or was said. Preserve story continuity — include character details, actions, emotions, and plot events. Even for very short messages, always write something. Never skip a message. Always respond in the language used in the messages.
+
+Return ONLY a JSON array, no other text, no markdown, no backticks. Format:
+[{"msg":1,"summary":"..."},{"msg":2,"summary":"..."},...]
+
+MESSAGES:
+${numbered}`;
+
+            const response = await window.SillyTavern.getContext().generateRaw({
+                prompt: promptText,
+                quietToLoud: false,
+                system: "You are a helpful assistant that summarizes story messages. Always respond with valid JSON only."
+            });
+
+            let parsed = [];
+            try {
+                const clean = response.replace(/```json|```/g, "").trim();
+                parsed = JSON.parse(clean);
+            } catch (e) {
+                console.error(`[${extensionName}] Failed to parse batch response:`, e, response);
+                toastr.error("Ошибка парсинга ответа", "Summary Tracker");
+                return;
+            }
+
+            const facts = getCurrentFacts();
+            for (const item of parsed) {
+                if (item.summary && item.summary.trim().length > 5) {
+                    facts.push(item.summary.trim());
+                }
+            }
+            setCurrentFacts(facts);
+            renderFacts();
         }
+
         setLastScanned(endIndex);
         saveSettingsDebounced();
         toastr.success("Готово!", "Summary Tracker");
     } catch (error) {
         console.error(`[${extensionName}] Error:`, error);
+        toastr.error("Ошибка сканирования", "Summary Tracker");
     }
 }
 
