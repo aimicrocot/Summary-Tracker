@@ -262,10 +262,11 @@ function loadSettings() {
     }
     $("#fmt_auto_scan").prop("checked", extension_settings[extensionName].autoScan);
     $("#fmt_skip_count").val(extension_settings[extensionName].skipCount || 2);
+    if (extension_settings[extensionName].isHidden === undefined) {
+        extension_settings[extensionName].isHidden = false;
+    }
     updateMaxSkip();
     renderFacts();
-    $("#fmt_toggle_hide").val(extension_settings[extensionName].isHidden ? "Show" : "Hide");
-}
 
 jQuery(async () => {
     try {
