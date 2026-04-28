@@ -307,7 +307,7 @@ jQuery(async () => {
        
         loadSettings();
 
-        eventSource.on(event_types.GENERATE_BEFORE_COMBINE_PROMPTS, () => {
+        eventSource.on(event_types.GENERATION_STARTED, () => {
             if (hiddenMessagesBuffer.length > 0) return; // уже вырезано, не трогаем
             const context = getContext();
             const chat = context.chat;
