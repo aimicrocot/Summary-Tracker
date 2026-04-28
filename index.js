@@ -337,6 +337,20 @@ jQuery(async () => {
             applyVisualHiding();
         });
 
+        eventSource.on("generation_stopped", () => {
+            if (hiddenMessagesBuffer.length > 0) {
+                const context = getContext();
+                const chat = context.chat;
+                for (let j = hiddenMessagesBuffer.length - 1; j >= 0; j--) {
+                    const { index, message } = hiddenMessagesBuffer[j];
+                    chat.splice(index, 0, message);
+                }
+                hiddenMessagesBuffer = [];
+                applyVisualHiding();
+                console.log(`[${extensionName}] Messages restored after generation stopped`);
+            }
+        });
+
         eventSource.on(event_types.MESSAGE_RECEIVED, updateMaxSkip);
         eventSource.on(event_types.CHAT_COMPLETED, applyVisualHiding);
         eventSource.on(event_types.CHAT_CHANGED, () => {
