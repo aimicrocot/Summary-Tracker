@@ -6,7 +6,7 @@
 
 ### About the Extension
 
-Not ready yet! A minimalist extension that hides messages from the context and extracts their essence, sending only the most important information into the chat context. It is designed to maximize token/cost efficiency, extend API key lifespan, and maintain context coherence during roleplay.
+A minimalist extension that hides messages from the context and extracts their essence, sending only the most important information into the chat context. It is designed to maximize token/cost efficiency, extend API key lifespan, and maintain context coherence during roleplay.
 
 ### Features
 
@@ -45,7 +45,7 @@ An extension with similar functionality that I came across: [https://github.com/
 
 ### О расширении
 
-Ещё в работе! Минималистичное расширение, которое скрывает сообщения из контекста и вытаскивает их суть в виде саммари, отправляя в контекст чата только его. Нужно для максимальной экономии токенов/денег, продления жизни API-ключей и сохранения связности контекста во время РП.
+Минималистичное расширение, которое скрывает сообщения из контекста и вытаскивает их суть в виде саммари, отправляя в контекст чата только его. Нужно для максимальной экономии токенов/денег, продления жизни API-ключей и сохранения связности контекста во время РП.
 
 ### Особенности
 
