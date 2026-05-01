@@ -325,10 +325,10 @@ jQuery(async () => {
        
         loadSettings();
 
-        eventSource.on("generation_started", (data) => {
+        eventSource.on("generation_started", (data, _extraData, isDryRun) => {
             if (isScanning) return;
             if (hiddenMessagesBuffer.length > 0) return;
-            if (data?.dryRun) return;
+            if (isDryRun) return;
             const context = getContext();
             const chat = context.chat;
             const toRemove = [];
