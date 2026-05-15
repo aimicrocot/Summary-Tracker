@@ -146,6 +146,49 @@ function renderFacts() {
 
 // --- ЛОГИКА СКАНИРОВАНИЯ ---
 
+function renderSummary() {
+    const container = $("#fmt_summary_combined");
+    const facts = getCurrentFacts();
+
+    if (!facts || facts.length === 0) {
+        container.html('<small style="opacity:0.5;">Empty...</small>');
+        return;
+    }
+
+    const combinedText = facts.join(" ");
+    const html = `
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.1);">
+            <div id="fmt_summary_text" style="font-size: 0.9em; flex-grow: 1; margin-right: 10px; word-break: break-word; color: #e0e0e0;">${combinedText}</div>
+            <div style="display: flex; gap: 8px; flex-shrink: 0;">
+                <i class="fa-solid fa-pen-to-square" id="fmt_summary_edit_btn" style="cursor: pointer; color: #4a9eff; font-size: 0.9em;" title="Редактировать"></i>
+                <i class="fa-solid fa-trash" id="fmt_summary_delete_btn" style="cursor: pointer; color: #ff5555; font-size: 0.9em;" title="Удалить"></i>
+            </div>
+        </div>`;
+    container.html(html);
+
+    $("#fmt_summary_delete_btn").off("click").on("click", function() {
+        if (confirm("Delete summary?")) {
+            setCurrentFacts([]);
+            saveSettingsDebounced();
+            renderFacts();
+            renderSummary();
+            toastr.info("Summary deleted");
+        }
+    });
+
+    $("#fmt_summary_edit_btn").off("click").on("click", function() {
+        const current = facts.join(" ");
+        const edited = prompt("Edit summary:", current);
+        if (edited !== null && edited.trim() !== "") {
+            setCurrentFacts([edited.trim()]);
+            saveSettingsDebounced();
+            renderFacts();
+            renderSummary();
+            toastr.success("Summary updated");
+        }
+    });
+}
+
 async function runAutoScan() {
     if (!getCurrentChatId()) {
         toastr.warning("Open the chat first");
