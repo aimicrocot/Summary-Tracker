@@ -403,6 +403,7 @@ jQuery(async () => {
                     chat.splice(index, 0, message);
                 }
                 hiddenMessagesBuffer = [];
+                await context.reloadCurrentChat();
             }
             await handleChatEvent();
             applyVisualHiding();
