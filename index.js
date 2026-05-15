@@ -95,6 +95,7 @@ function deleteFact(index) {
     setCurrentFacts(facts);
     saveSettingsDebounced();
     renderFacts();
+    renderSummary();
     toastr.info("Факт удален");
 }
 
@@ -107,6 +108,7 @@ function editFact(index) {
         setCurrentFacts(facts);
         saveSettingsDebounced();
         renderFacts();
+        renderSummary();
         toastr.success("Факт обновлен");
     }
 }
@@ -119,7 +121,8 @@ function renderFacts() {
 
     if (!facts || facts.length === 0) {
         listContainer.html('<small style="opacity:0.5;">Empty...</small>');
-        applyVisualHiding(); 
+        applyVisualHiding();
+        renderSummary();
         return;
     }
 
@@ -142,6 +145,7 @@ function renderFacts() {
 
     applyVisualHiding();
     updateHideButton();
+    renderSummary();
 }
 
 // --- ЛОГИКА СКАНИРОВАНИЯ ---
@@ -233,6 +237,7 @@ async function runAutoScan() {
                 facts.push(newFact);
                 setCurrentFacts(facts);
                 renderFacts();
+                renderSummary();
             }
         } else {
             // Batch-скан: все сообщения одним запросом
@@ -272,6 +277,7 @@ ${numbered}`;
             }
             setCurrentFacts(facts);
             renderFacts();
+            renderSummary();
         }
 
         setLastScanned(endIndex);
@@ -321,6 +327,7 @@ function loadSettings() {
     }
     updateMaxSkip();
     renderFacts();
+    renderSummary();
     const facts = getCurrentFacts();
     if (facts.length === 0) {
         extension_settings[extensionName].isHidden = false;
@@ -353,6 +360,7 @@ jQuery(async () => {
                 setLastScanned(0);
                 saveSettingsDebounced();
                 renderFacts();
+                renderSummary();
             }
         });
 
@@ -418,6 +426,7 @@ jQuery(async () => {
         eventSource.on(event_types.CHAT_COMPLETED, applyVisualHiding);
         eventSource.on(event_types.CHAT_CHANGED, () => {
             renderFacts();
+            renderSummary();
             applyVisualHiding();
         });
         
