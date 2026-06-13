@@ -17,7 +17,7 @@
                   ctype="number"
                   cmin="1"
                   cdisabled
-                  cstyle="width: 60px;
+                  style="width: 60px; max-width: 60px;
                   color: var(--text-color);
                   background-color: var(--input-bg-color);
                   border: 1px solid rgba(255,255,255,0.2);
@@ -70,4 +70,9 @@
 </div>
 <style>
 .fmt-hidden { display: none !important; }
+#fmt_scan_interval:disabled {
+    background-color: var(--input-bg-color) !important;
+    color: var(--text-color) !important;
+    width: 60px !important;
+}
 </style>
