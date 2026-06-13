@@ -1,4 +1,4 @@
-# Summary Tracker
+# Summary Tracker (in process)
 
 ## Eng ReadMe
 
@@ -7,6 +7,11 @@
 ### About the Extension
 
 A minimalist extension that hides messages from the context and extracts their essence, sending only the most important information into the chat context. It is designed to maximize token/cost efficiency, extend API key lifespan, and maintain context coherence during roleplay.
+
+### Fixed & Added
+
+* Fixed a bug with visual hiding of messages, when it showed empty space instead of messages.
+* Added the ability to select how many messages will be scanned when autoscan is enabled, where 0 and 1 are scans of each message
 
 ### Features
 
