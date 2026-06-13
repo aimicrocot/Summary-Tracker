@@ -331,7 +331,7 @@ function loadSettings() {
     $("#fmt_scan_interval").val(extension_settings[extensionName].scanInterval || 1);
     const autoEnabled = extension_settings[extensionName].autoScan;
     $("#fmt_scan_interval").prop("disabled", !autoEnabled);
-    $("#fmt_scan_interval_row").css("opacity", autoEnabled ? "1" : "0.4");
+    $("#fmt_scan_interval_row").css("display", autoEnabled ? "flex" : "none");
     if (extension_settings[extensionName].isHidden === undefined) {
         extension_settings[extensionName].isHidden = false;
     }
