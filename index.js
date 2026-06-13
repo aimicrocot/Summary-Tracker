@@ -396,6 +396,7 @@ jQuery(async () => {
 
         eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, async () => {
             if (hiddenMessagesBuffer.length > 0) {
+                const bufferLength = hiddenMessagesBuffer.length;
                 const context = getContext();
                 const chat = context.chat;
                 for (let j = hiddenMessagesBuffer.length - 1; j >= 0; j--) {
@@ -403,6 +404,18 @@ jQuery(async () => {
                     chat.splice(index, 0, message);
                 }
                 hiddenMessagesBuffer = [];
+
+                const mesidSeen = new Set();
+                 $('.mes').each(function() {
+                     const mesidAttr = $(this).attr('mesid');
+                     if (mesidAttr === undefined || mesidAttr === '') return;
+                     const mesid = parseInt(mesidAttr);
+                     if (mesidSeen.has(mesid)) {
+                         $(this).attr('mesid', mesid + bufferLength);
+                     } else {
+                         mesidSeen.add(mesid);
+                     }
+                });
             }
             await handleChatEvent();
             applyVisualHiding();
