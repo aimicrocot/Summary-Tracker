@@ -9,6 +9,22 @@
                 <input id="fmt_auto_scan" type="checkbox" />
                 <label for="fmt_auto_scan">Enable auto-scanning</label>
             </div>
+
+            <div class="flex-container" id="fmt_scan_interval_row" style="margin-top: 8px; display: flex; align-items: center; opacity: 0.4;">
+                <label for="fmt_scan_interval" style="margin-right: 10px;">Scan every N messages:</label>
+                <input id="fmt_scan_interval"
+                  class="text_bg"
+                  ctype="number"
+                  cmin="1"
+                  cdisabled
+                  cstyle="width: 60px;
+                  color: var(--text-color);
+                  background-color: var(--input-bg-color);
+                  border: 1px solid rgba(255,255,255,0.2);
+                  border-radius: 4px;
+                  padding: 2px;
+                  text-align: center;" />
+            </div>
             
             <div class="flex-container" style="margin-top: 10px; display: flex; align-items: center;">
                 <label for="fmt_skip_count" style="margin-right: 10px;">Leave messages (minimum 2):</label>
