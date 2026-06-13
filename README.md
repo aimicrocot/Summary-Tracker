@@ -10,8 +10,8 @@ A minimalist extension that hides messages from the context and extracts their e
 
 ### Fixed & Added
 
-* Fixed a bug with visual hiding of messages, when it showed empty space instead of messages.
-* Added the ability to select how many messages will be scanned when autoscan is enabled, where 0 and 1 are scans of each message
+* Fixed a bug with visual hiding of messages, when it showed empty space instead of messages
+* Added an option to set the summarization frequency when auto-scanning is enabled. The value specifies how many messages should pass between summarizations; 0 and 1 mean every message is summarized
 
 ### Features
 
@@ -51,6 +51,11 @@ An extension with similar functionality that I came across: [https://github.com/
 ### О расширении
 
 Минималистичное расширение, которое скрывает сообщения из контекста и вытаскивает их суть в виде саммари, отправляя в контекст чата только его. Нужно для максимальной экономии токенов/денег, продления жизни API-ключей и сохранения связности контекста во время РП.
+
+### Исправлено и добавлено
+
+* Исправлена ​​ошибка визуального скрытия сообщений, когда вместо сообщений отображалось пустое пространство
+* Добавлена ​​возможность ввести число, через сколько сообщений будет происходить каждый самрайз при включенном автосканировании, где 0 и 1 означает самрайз и скрытие каждого сообщения
 
 ### Особенности
 
