@@ -7,6 +7,7 @@ const extensionFolderPath = `scripts/extensions/third-party/${extensionName}`;
 const defaultSettings = {
     autoScan: false,
     skipCount: 2,
+    scanInterval: 1,
     isHidden: false,
     factsByChatId: {},
     lastScannedByChatId: {}
@@ -294,7 +295,12 @@ ${numbered}`;
 async function handleChatEvent() {
     if (!extension_settings[extensionName].autoScan) return;
     const chat = getContext().chat;
-    if (chat && chat.length > 0) {
+    if (!chat || chat.length === 0) return;
+    const scanInterval = parseInt(extension_settings[extensionName].scanInterval) || 1;
+    const skipCount = parseInt(extension_settings[extensionName].skipCount) || 2;
+    const endIndex = chat.length - skipCount;
+    const lastScanned = getLastScanned();
+    if ((endIndex - lastScanned) >= scanInterval) {
         await runAutoScan();
     }
 }
@@ -322,6 +328,10 @@ function loadSettings() {
     }
     $("#fmt_auto_scan").prop("checked", extension_settings[extensionName].autoScan);
     $("#fmt_skip_count").val(extension_settings[extensionName].skipCount || 2);
+    $("#fmt_scan_interval").val(extension_settings[extensionName].scanInterval || 1);
+    const autoEnabled = extension_settings[extensionName].autoScan;
+    $("#fmt_scan_interval").prop("disabled", !autoEnabled);
+    $("#fmt_scan_interval_row").css("opacity", autoEnabled ? "1" : "0.4");
     if (extension_settings[extensionName].isHidden === undefined) {
         extension_settings[extensionName].isHidden = false;
     }
