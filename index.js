@@ -55,6 +55,12 @@ function setLastScanned(index) {
     extension_settings[extensionName].lastScannedByChatId[chatId] = index;
 }
 
+function buildFullContext() {
+    const facts = getCurrentFacts();
+    if (!facts || facts.length === 0) return "";
+    return facts.join(" ");
+}
+
 // --- ФУНКЦИИ ВИЗУАЛИЗАЦИИ И СКРЫТИЯ ---
 
 function applyVisualHiding() {
