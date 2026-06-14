@@ -330,8 +330,10 @@ function loadSettings() {
     $("#fmt_skip_count").val(extension_settings[extensionName].skipCount || 2);
     $("#fmt_scan_interval").val(extension_settings[extensionName].scanInterval || 1);
     const autoEnabled = extension_settings[extensionName].autoScan;
-    $("#fmt_scan_interval").prop("disabled", !autoEnabled);
-    $("#fmt_scan_interval_row").css("display", autoEnabled ? "flex" : "none");
+    setTimeout(() => {
+        $("#fmt_scan_interval").prop("disabled", !autoEnabled);
+        $("#fmt_scan_interval_row").css("display", autoEnabled ? "flex" : "none");
+    }, 100);
     if (extension_settings[extensionName].isHidden === undefined) {
         extension_settings[extensionName].isHidden = false;
     }
