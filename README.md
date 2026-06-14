@@ -41,8 +41,8 @@ My Telegram-channel: [@sillytavern1](https://t.me/sillytavern1)
 
 ### Inspired by
 
-An extension with similar functionality that I came across: [https://github.com/Kristyku/InlineSummary](https://github.com/Kristyku/InlineSummary)
-An extension with some inspiring functionality and code: [https://github.com/Lodactio/Extension-Summaryception](https://github.com/Lodactio/Extension-Summaryception)
+- An extension with similar functionality that I came across: [https://github.com/Kristyku/InlineSummary](https://github.com/Kristyku/InlineSummary)
+- An extension with some inspiring functionality and code: [https://github.com/Lodactio/Extension-Summaryception](https://github.com/Lodactio/Extension-Summaryception)
 
 
 </details>
@@ -94,5 +94,5 @@ Chat history не отобразит вырезку сообщений расш�
 
 ### Вдохновлено
 
-Встретившееся расширение с похожим функционалом (но сообщения для скрытия надо выбирать вручную): [https://github.com/Kristyku/InlineSummary](https://github.com/Kristyku/InlineSummary)
-Вдохновляющее функционалом и кодом: [https://github.com/Lodactio/Extension-Summaryception](https://github.com/Lodactio/Extension-Summaryception)
+- Встретившееся расширение с похожим функционалом (но сообщения для скрытия надо выбирать вручную): [https://github.com/Kristyku/InlineSummary](https://github.com/Kristyku/InlineSummary)
+- Вдохновляющее функционалом и кодом: [https://github.com/Lodactio/Extension-Summaryception](https://github.com/Lodactio/Extension-Summaryception)
