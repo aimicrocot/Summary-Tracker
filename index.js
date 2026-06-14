@@ -195,6 +195,7 @@ function renderSummary() {
 }
 
 async function runAutoScan() {
+    if (isScanning) return;
     if (!getCurrentChatId()) {
         toastr.warning("Open the chat first");
         return;
