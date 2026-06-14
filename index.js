@@ -81,11 +81,11 @@ function applyVisualHiding() {
         }
     });
 
-    if (facts.length > 0 && cutOffIndex > 0) {
-        const factsSummary = "### System Note: Key facts from previous conversation:\n" + facts.join("\n");
-        context.extension_prompt = factsSummary;
+    const fullContext = buildFullContext();
+    if (fullContext.length > 0 && cutOffIndex > 0) {
+        context.setExtensionPrompt(extensionName, fullContext, 1, 9999, false, 0);
     } else {
-        context.extension_prompt = "";
+        context.setExtensionPrompt(extensionName, "", 1, 9999, false, 0);
     }
 }
 // --- ФУНКЦИИ УПРАВЛЕНИЯ ФАКТАМИ ---
