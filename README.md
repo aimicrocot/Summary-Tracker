@@ -95,4 +95,4 @@ Chat history не отобразит вырезку сообщений расш�
 ### Вдохновлено
 
 Встретившееся расширение с похожим функционалом (но сообщения для скрытия надо выбирать вручную): [https://github.com/Kristyku/InlineSummary](https://github.com/Kristyku/InlineSummary)
-Вдохновляющее функционалом и кодом: [ https://github.com/Lodactio/Extension-Summaryception]( https://github.com/Lodactio/Extension-Summaryception)
+Вдохновляющее функционалом и кодом: [ https://github.com/Lodactio/Extension-Summaryception](https://github.com/Lodactio/Extension-Summaryception)
