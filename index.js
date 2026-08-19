@@ -88,7 +88,7 @@ function applyVisualHiding() {
     });
 
     const fullContext = buildFullContext();
-    if (fullContext.length > 0 && cutOffIndex > 0) {
+    if (shouldHide && fullContext.length > 0 && cutOffIndex > 0) {
         context.setExtensionPrompt(extensionName, fullContext, 1, 9999, false, 0);
     } else {
         context.setExtensionPrompt(extensionName, "", 1, 9999, false, 0);
