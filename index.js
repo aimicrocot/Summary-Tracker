@@ -10,16 +10,18 @@ const defaultSettings = {
     scanInterval: 1,
     isHidden: false,
     factsByChatId: {},
-    lastScannedByChatId: {}
+    lastScannedByChatId: {},
+    compressAfter: 20,
+    layerSummaryByChatId: {}
 };
 
 let hiddenMessagesBuffer = []; // хранит { index, message } для точного возврата
 let isScanning = false; // флаг активного скана через generateRaw
 
 function updateHideButton() {
-    const facts = getCurrentFacts();
+    const hasMemory = buildFullContext().length > 0;
     const isHidden = extension_settings[extensionName].isHidden;
-    if (facts.length === 0) {
+    if (!hasMemory) {
         $("#fmt_toggle_hide").val("No facts").prop("disabled", true);
     } else {
         $("#fmt_toggle_hide").val(isHidden ? "Show" : "Hide").prop("disabled", false);
@@ -55,10 +57,55 @@ function setLastScanned(index) {
     extension_settings[extensionName].lastScannedByChatId[chatId] = index;
 }
 
-function buildFullContext() {
+function getLayerSummary() {
+    const chatId = getCurrentChatId();
+    if (!chatId) return "";
+    return extension_settings[extensionName].layerSummaryByChatId[chatId] || "";
+}
+
+function setLayerSummary(text) {
+    const chatId = getCurrentChatId();
+    if (!chatId) return;
+    extension_settings[extensionName].layerSummaryByChatId[chatId] = text;
+}
+
+async function maybeCompressFacts() {
+    const compressAfter = parseInt(extension_settings[extensionName].compressAfter) || 20;
     const facts = getCurrentFacts();
-    if (!facts || facts.length === 0) return "";
-    return facts.join(" ");
+    if (facts.length < compressAfter) return;
+
+    const existingLayer = getLayerSummary();
+    const promptText = `TASK: Compress the following list of facts into a single concise paragraph that preserves all key story details for context continuity. Do not use markdown, headers, or lists — output plain text only, one paragraph. Write in the same language as the input.\n\nEXISTING COMPRESSED SUMMARY (merge with this, do not repeat, keep or update as needed):\n${existingLayer || "(none yet)"}\n\nNEW FACTS TO COMPRESS:\n${facts.join("\n")}`;
+
+    toastr.info(`Сжатие ${facts.length} фактов в единый саммари...`, "Summary Tracker");
+
+    try {
+        const response = await window.SillyTavern.getContext().generateRaw({
+            prompt: promptText,
+            quietToLoud: false,
+            system: "You are a helpful assistant. Compress the facts into a single concise paragraph. Output only plain text, no markdown, no lists, no headers."
+        });
+
+        const compressed = response ? response.trim() : "";
+        if (compressed.length > 10) {
+            setLayerSummary(compressed);
+            setCurrentFacts([]);
+            saveSettingsDebounced();
+            toastr.success("Саммари сжат!", "Summary Tracker");
+        }
+    } catch (error) {
+        console.error(`[${extensionName}] Compression error:`, error);
+        toastr.error("Ошибка сжатия", "Summary Tracker");
+    }
+}
+
+function buildFullContext() {
+    const layerSummary = getLayerSummary();
+    const facts = getCurrentFacts();
+    const parts = [];
+    if (layerSummary) parts.push(layerSummary);
+    if (facts && facts.length > 0) parts.push(facts.join(" "));
+    return parts.join(" ");
 }
 
 // --- ФУНКЦИИ ВИЗУАЛИЗАЦИИ И СКРЫТИЯ ---
@@ -159,14 +206,12 @@ function renderFacts() {
 
 function renderSummary() {
     const container = $("#fmt_summary_combined");
-    const facts = getCurrentFacts();
+    const combinedText = buildFullContext();
 
-    if (!facts || facts.length === 0) {
+    if (!combinedText) {
         container.html('<small style="opacity:0.5;">Empty...</small>');
         return;
     }
-
-    const combinedText = facts.join(" ");
     const html = `
         <div style="display: flex; justify-content: space-between; align-items: flex-start; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.1);">
             <div id="fmt_summary_text" style="font-size: 0.9em; flex-grow: 1; margin-right: 10px; word-break: break-word; color: #e0e0e0;">${combinedText}</div>
@@ -180,25 +225,28 @@ function renderSummary() {
     $("#fmt_summary_delete_btn").off("click").on("click", function() {
         if (confirm("Delete summary?")) {
             setCurrentFacts([]);
+            setLayerSummary("");
+            extension_settings[extensionName].isHidden = false;
             saveSettingsDebounced();
             renderFacts();
             renderSummary();
+            updateHideButton();
             toastr.info("Summary deleted");
         }
     });
 
     $("#fmt_summary_edit_btn").off("click").on("click", function() {
-        const current = facts.join(" ");
+        const current = buildFullContext();
         const edited = prompt("Edit summary:", current);
         if (edited !== null && edited.trim() !== "") {
-            setCurrentFacts([edited.trim()]);
+            setLayerSummary(edited.trim());
+            setCurrentFacts([]);
             saveSettingsDebounced();
             renderFacts();
             renderSummary();
             toastr.success("Summary updated");
         }
     });
-}
 
 async function runAutoScan() {
     if (isScanning) return;
@@ -244,6 +292,7 @@ async function runAutoScan() {
                 const facts = getCurrentFacts();
                 facts.push(newFact);
                 setCurrentFacts(facts);
+                await maybeCompressFacts();
                 renderFacts();
                 renderSummary();
             }
@@ -284,9 +333,9 @@ ${numbered}`;
                 }
             }
             setCurrentFacts(facts);
+            await maybeCompressFacts();
             renderFacts();
             renderSummary();
-        }
 
         setLastScanned(endIndex);
         saveSettingsDebounced();
@@ -330,13 +379,16 @@ function loadSettings() {
     if (!extension_settings[extensionName].lastScannedByChatId) {
         extension_settings[extensionName].lastScannedByChatId = {};
     }
+    if (!extension_settings[extensionName].layerSummaryByChatId) {
+        extension_settings[extensionName].layerSummaryByChatId = {};
+    }
     if (extension_settings[extensionName].isHidden === undefined) {
         extension_settings[extensionName].isHidden = false;
     }
     $("#fmt_auto_scan").prop("checked", extension_settings[extensionName].autoScan);
     $("#fmt_skip_count").val(extension_settings[extensionName].skipCount || 2);
     $("#fmt_scan_interval").val(extension_settings[extensionName].scanInterval || 1);
-    const autoEnabled = extension_settings[extensionName].autoScan;
+    $("#fmt_compress_after").val(extension_settings[extensionName].compressAfter || 20);
     setTimeout(() => {
         $("#fmt_scan_interval").prop("disabled", !autoEnabled);
         $("#fmt_scan_interval_row").css("display", autoEnabled ? "flex" : "none");
@@ -372,14 +424,23 @@ jQuery(async () => {
             applyVisualHiding();
         });
 
+        $("#fmt_compress_after").on("input", (e) => {
+            let val = parseInt($(e.target).val()) || 20;
+            extension_settings[extensionName].compressAfter = val;
+            saveSettingsDebounced();
+        });
+
         $("#fmt_manual_scan").on("click", runAutoScan);
         $("#fmt_clear_facts").on("click", () => {
             if (confirm("Очистить всё?")) {
                 setCurrentFacts([]);
+                setLayerSummary("");
                 setLastScanned(0);
+                extension_settings[extensionName].isHidden = false;
                 saveSettingsDebounced();
                 renderFacts();
                 renderSummary();
+                updateHideButton();
             }
         });
 
