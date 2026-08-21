@@ -244,6 +244,7 @@ function renderFacts() {
     if (!facts || facts.length === 0) {
         listContainer.html('<small style="opacity:0.5;">Empty...</small>');
         applyVisualHiding();
+        updateHideButton();
         renderSummary();
         return;
     }
@@ -473,13 +474,11 @@ function loadSettings() {
     updateMaxSkip();
     renderFacts();
     renderSummary();
-    const facts = getCurrentFacts();
-    if (facts.length === 0) {
+    if (buildFullContext().length === 0) {
         extension_settings[extensionName].isHidden = false;
     }
     applyVisualHiding();
     updateHideButton();
-}
 
 jQuery(async () => {
     try {
@@ -543,8 +542,7 @@ jQuery(async () => {
         });
 
         $("#fmt_toggle_hide").on("click", () => {
-            const facts = getCurrentFacts();
-            if (facts.length === 0) return;
+            if (buildFullContext().length === 0) return;
             const isHidden = !extension_settings[extensionName].isHidden;
             extension_settings[extensionName].isHidden = isHidden;
             saveSettingsDebounced();
