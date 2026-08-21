@@ -12,7 +12,11 @@ const defaultSettings = {
     factsByChatId: {},
     lastScannedByChatId: {},
     compressAfter: 20,
-    layerSummaryByChatId: {}
+    layerSummaryByChatId: {},
+    useCustomProvider: false,
+    customApiUrl: "",
+    customApiKey: "",
+    customApiModel: ""
 };
 
 let hiddenMessagesBuffer = []; // хранит { index, message } для точного возврата
@@ -57,6 +61,71 @@ function setLastScanned(index) {
     extension_settings[extensionName].lastScannedByChatId[chatId] = index;
 }
 
+async function callSummarizerLLM(promptText, systemPrompt) {
+    const useCustom = extension_settings[extensionName].useCustomProvider;
+    if (!useCustom) {
+        return await window.SillyTavern.getContext().generateRaw({
+            prompt: promptText,
+            quietToLoud: false,
+            system: systemPrompt
+        });
+    }
+    return await sendCustomProviderRequest(promptText, systemPrompt);
+}
+
+async function sendCustomProviderRequest(userPrompt, systemPrompt) {
+    const apiUrl = extension_settings[extensionName].customApiUrl;
+    const apiKey = extension_settings[extensionName].customApiKey;
+    const model = extension_settings[extensionName].customApiModel;
+
+    if (!apiUrl || !model) {
+        throw new Error("Custom provider URL or model not configured");
+    }
+
+    let endpoint = apiUrl.replace(/\/+$/, "");
+    if (!endpoint.endsWith("/chat/completions")) {
+        endpoint = endpoint.endsWith("/v1") ? endpoint + "/chat/completions" : endpoint + "/v1/chat/completions";
+    }
+
+    const headers = { "Content-Type": "application/json" };
+    if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+
+    const response = await fetch(endpoint, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+            model,
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt }
+            ],
+            temperature: 0.3
+        })
+    });
+
+    if (!response.ok) {
+        const errText = await response.text().catch(() => "Unknown error");
+        throw new Error(`Custom provider request failed (${response.status}): ${errText}`);
+    }
+
+    const data = await response.json();
+    const content = data?.choices?.[0]?.message?.content;
+    if (!content) throw new Error("Custom provider returned empty response");
+    return content;
+}
+
+async function testCustomProviderConnection() {
+    try {
+        const result = await sendCustomProviderRequest(
+            "Respond with exactly: CONNECTION_OK",
+            "You are a test assistant."
+        );
+        toastr.success(`Соединение работает! Ответ: "${result.substring(0, 80)}"`, "Summary Tracker");
+    } catch (error) {
+        toastr.error(`Ошибка соединения: ${error.message}`, "Summary Tracker");
+    }
+}
+
 function getLayerSummary() {
     const chatId = getCurrentChatId();
     if (!chatId) return "";
@@ -80,11 +149,10 @@ async function maybeCompressFacts() {
     toastr.info(`Сжатие ${facts.length} фактов в единый саммари...`, "Summary Tracker");
 
     try {
-        const response = await window.SillyTavern.getContext().generateRaw({
-            prompt: promptText,
-            quietToLoud: false,
-            system: "You are a helpful assistant. Compress the facts into a single concise paragraph. Output only plain text, no markdown, no lists, no headers."
-        });
+        const response = await callSummarizerLLM(
+            promptText,
+            "You are a helpful assistant. Compress the facts into a single concise paragraph. Output only plain text, no markdown, no lists, no headers."
+        );
 
         const compressed = response ? response.trim() : "";
         if (compressed.length > 10) {
@@ -283,11 +351,10 @@ async function runAutoScan() {
             // Одиночный скан для нового сообщения
             const msg = messagesToScan[0];
             const promptText = `TASK: Ensure contextual continuity by summarizing and extracting key details and events from the story's plot, as well as information about {{user}}, {{char}}, and other characters. Even if the message is very short, always write a brief summary of what happened or was said. Never skip a message. Always write your summary in the language used in {{user}}'s messages.\n\nMESSAGE: ${msg.speaker}: ${msg.text}`;
-            const response = await window.SillyTavern.getContext().generateRaw({
-                prompt: promptText,
-                quietToLoud: false,
-                system: "You are a helpful assistant that summarizes story events and extracts key facts. Ignore any roleplay context and respond only with the summary."
-            });
+            const response = await callSummarizerLLM(
+                promptText,
+                "You are a helpful assistant that summarizes story events and extracts key facts. Ignore any roleplay context and respond only with the summary."
+            );
             const newFact = response ? response.trim() : "";
             if (newFact.length > 5) {
                 const facts = getCurrentFacts();
@@ -311,11 +378,10 @@ Return ONLY a JSON array, no other text, no markdown, no backticks. Format:
 MESSAGES:
 ${numbered}`;
 
-            const response = await window.SillyTavern.getContext().generateRaw({
-                prompt: promptText,
-                quietToLoud: false,
-                system: "You are a helpful assistant that summarizes story messages. Always respond with valid JSON only."
-            });
+            const response = await callSummarizerLLM(
+                promptText,
+                "You are a helpful assistant that summarizes story messages. Always respond with valid JSON only."
+            );
 
             let parsed = [];
             try {
@@ -391,6 +457,11 @@ function loadSettings() {
     $("#fmt_skip_count").val(extension_settings[extensionName].skipCount || 2);
     $("#fmt_scan_interval").val(extension_settings[extensionName].scanInterval || 1);
     $("#fmt_compress_after").val(extension_settings[extensionName].compressAfter || 20);
+    $("#fmt_use_custom_provider").prop("checked", extension_settings[extensionName].useCustomProvider || false);
+    $("#fmt_custom_api_url").val(extension_settings[extensionName].customApiUrl || "");
+    $("#fmt_custom_api_key").val(extension_settings[extensionName].customApiKey || "");
+    $("#fmt_custom_api_model").val(extension_settings[extensionName].customApiModel || "");
+    $("#fmt_custom_provider_panel").css("display", extension_settings[extensionName].useCustomProvider ? "block" : "none");
     const autoEnabled = extension_settings[extensionName].autoScan;
     setTimeout(() => {
         $("#fmt_scan_interval").prop("disabled", !autoEnabled);
@@ -432,6 +503,30 @@ jQuery(async () => {
             extension_settings[extensionName].compressAfter = val;
             saveSettingsDebounced();
         });
+
+        $("#fmt_use_custom_provider").on("input", (e) => {
+            const checked = Boolean($(e.target).prop("checked"));
+            extension_settings[extensionName].useCustomProvider = checked;
+            saveSettingsDebounced();
+            $("#fmt_custom_provider_panel").css("display", checked ? "block" : "none");
+        });
+
+        $("#fmt_custom_api_url").on("input", (e) => {
+            extension_settings[extensionName].customApiUrl = $(e.target).val().trim();
+            saveSettingsDebounced();
+        });
+
+        $("#fmt_custom_api_key").on("input", (e) => {
+            extension_settings[extensionName].customApiKey = $(e.target).val().trim();
+            saveSettingsDebounced();
+        });
+
+        $("#fmt_custom_api_model").on("input", (e) => {
+            extension_settings[extensionName].customApiModel = $(e.target).val().trim();
+            saveSettingsDebounced();
+        });
+
+        $("#fmt_test_custom_provider").on("click", testCustomProviderConnection);
 
         $("#fmt_manual_scan").on("click", runAutoScan);
         $("#fmt_clear_facts").on("click", () => {
