@@ -328,7 +328,10 @@ async function runAutoScan() {
     const context = getContext();
     const chat = context.chat;
     const skipCount = parseInt(extension_settings[extensionName].skipCount) || 2;
-    if (!chat || chat.length <= skipCount) return;
+    if (!chat || chat.length <= skipCount) {
+        isScanning = false;
+        return;
+    }
 
     const endIndex = chat.length - skipCount;
     const startIndex = getLastScanned();
@@ -342,6 +345,7 @@ async function runAutoScan() {
 
     if (messagesToScan.length === 0) {
         toastr.info("No new messages to scan", "Facts Tracker");
+        isScanning = false;
         return;
     }
 
@@ -479,7 +483,8 @@ function loadSettings() {
     }
     applyVisualHiding();
     updateHideButton();
-
+}
+    
 jQuery(async () => {
     try {
         const settingsHtml = await $.get(`${extensionFolderPath}/example.html`);
@@ -495,6 +500,12 @@ jQuery(async () => {
             extension_settings[extensionName].skipCount = val;
             saveSettingsDebounced();
             applyVisualHiding();
+        });
+
+        $("#fmt_scan_interval").on("input", (e) => {
+            let val = parseInt($(e.target).val()) || 1;
+            extension_settings[extensionName].scanInterval = val;
+            saveSettingsDebounced();
         });
 
         $("#fmt_compress_after").on("input", (e) => {
