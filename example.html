@@ -1,0 +1,75 @@
+<div class="summary-tracker-settings">
+    <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+            <b>Summary Tracker</b>
+            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+        </div>
+        <div class="inline-drawer-content">
+            <div class="flex-container">
+                <input id="fmt_auto_scan" type="checkbox" />
+                <label for="fmt_auto_scan">Enable auto-scanning</label>
+            </div>
+
+            <div class="fmt-row" id="fmt_scan_interval_row" style="display: none;">
+                <label for="fmt_scan_interval">Scan every N messages:</label>
+                <input id="fmt_scan_interval" class="text_bg fmt-number-input" type="number" min="1" disabled />
+            </div>
+
+            <div class="flex-container" style="margin-top: 8px;">
+                <input id="fmt_auto_hide" type="checkbox" />
+                <label for="fmt_auto_hide" style="margin-left: 5px;">Auto-hide after summarize</label>
+            </div>
+
+            <div class="fmt-row">
+                <label for="fmt_skip_count">Leave messages (minimum 2):</label>
+                <input id="fmt_skip_count" class="text_bg fmt-number-input" type="number" min="2" />
+            </div>
+
+            <div class="fmt-row">
+                <label for="fmt_compress_after">Compress after N facts:</label>
+                <input id="fmt_compress_after" class="text_bg fmt-number-input" type="number" min="2" />
+            </div>
+
+            <div class="fmt-row">
+                <input id="fmt_use_custom_provider" type="checkbox" />
+                <label for="fmt_use_custom_provider" style="margin-left: 5px;">Use custom provider for summarization</label>
+            </div>
+
+            <div id="fmt_custom_provider_panel" class="fmt-provider-panel">
+                <div class="fmt-field">
+                    <label for="fmt_custom_api_url">Endpoint URL:</label>
+                    <input id="fmt_custom_api_url" class="text_bg fmt-text-input" type="text" placeholder="https://openrouter.ai/api/v1" />
+                </div>
+                <div class="fmt-field">
+                    <label for="fmt_custom_api_key">API Key:</label>
+                    <input id="fmt_custom_api_key" class="text_bg fmt-text-input" type="password" autocomplete="off" />
+                </div>
+                <div class="fmt-field">
+                    <label for="fmt_custom_api_model">Model:</label>
+                    <input id="fmt_custom_api_model" class="text_bg fmt-text-input" type="text" placeholder="deepseek/deepseek-chat" />
+                </div>
+                <input id="fmt_test_custom_provider" class="menu_button" type="button" value="Test Connection" />
+            </div>
+
+            <hr />
+
+            <div class="fmt-buttons">
+                <input id="fmt_manual_scan" class="menu_button" type="button" value="Scan" />
+                <input id="fmt_clear_facts" class="menu_button fmt-clear-button" type="button" value="Clear" />
+                <input id="fmt_toggle_hide" class="menu_button" type="button" value="Hide" />
+            </div>
+
+            <div class="fmt-block">
+                <b>Saved facts: <span id="fmt_facts_count">0</span></b>
+            </div>
+
+            <div class="fmt-block">
+                <b>Summary:</b>
+                <div id="fmt_summary_combined" class="fmt-box">
+                    <small class="fmt-placeholder">Empty...</small>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
