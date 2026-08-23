@@ -1,0 +1,144 @@
+.fmt-hidden {
+    display: none !important;
+}
+
+#fmt_scan_interval:disabled {
+    background-color: var(--input-bg-color) !important;
+    color: var(--text-color) !important;
+    width: 60px !important;
+}
+
+.summary-tracker-settings .fmt-number-input {
+    width: 60px;
+    max-width: 60px;
+    padding: 2px;
+    text-align: center;
+    color: var(--text-color);
+    background-color: var(--input-bg-color);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
+
+.summary-tracker-settings .fmt-text-input {
+    width: 100%;
+    padding: 4px;
+    color: var(--text-color);
+    background-color: var(--input-bg-color);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
+
+.summary-tracker-settings .fmt-row {
+    display: flex;
+    align-items: center;
+    margin-top: 10px;
+}
+
+.summary-tracker-settings .fmt-row label {
+    margin-right: 10px;
+}
+
+.summary-tracker-settings .fmt-provider-panel {
+    display: none;
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 5px;
+}
+
+.summary-tracker-settings .fmt-field {
+    margin-bottom: 8px;
+}
+
+.summary-tracker-settings .fmt-field label {
+    display: block;
+    margin-bottom: 3px;
+    font-size: 0.85em;
+}
+
+.summary-tracker-settings .fmt-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.summary-tracker-settings .fmt-clear-button {
+    background-color: #5c1d1d !important;
+}
+
+.summary-tracker-settings .fmt-block {
+    margin-top: 15px;
+}
+
+.summary-tracker-settings .fmt-box {
+    margin-top: 10px;
+    padding: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 5px;
+}
+
+.summary-tracker-settings .fmt-placeholder {
+    opacity: 0.5;
+}
+
+.summary-tracker-settings .fmt-summary-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 5px;
+}
+
+.summary-tracker-settings .fmt-summary-text {
+    flex-grow: 1;
+    margin-right: 10px;
+    font-size: 0.9em;
+    word-break: break-word;
+    color: #e0e0e0;
+}
+
+.summary-tracker-settings .fmt-summary-editor {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px;
+    font-size: 0.9em;
+    line-height: 1.4;
+    resize: vertical;
+    color: var(--text-color);
+    background-color: var(--input-bg-color);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
+
+.summary-tracker-settings .fmt-editor-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.summary-tracker-settings .fmt-hint {
+    display: block;
+    margin-top: 3px;
+    font-size: 0.75em;
+    opacity: 0.6;
+}
+
+.summary-tracker-settings .fmt-summary-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.summary-tracker-settings .fmt-summary-actions i {
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.summary-tracker-settings .fmt-edit-icon {
+    color: #4a9eff;
+}
+
+.summary-tracker-settings .fmt-delete-icon {
+    color: #ff5555;
+}
