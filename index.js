@@ -1,9 +1,9 @@
 import { extension_settings, getContext } from "../../../extensions.js";
 import { saveSettingsDebounced, eventSource, event_types } from "../../../../script.js";
-
+ 
 const extensionName = "Summary-Tracker";
 const extensionFolderPath = `scripts/extensions/third-party/${extensionName}`;
-
+ 
 const defaultSettings = {
     autoScan: false,
     skipCount: 2,
@@ -18,10 +18,42 @@ const defaultSettings = {
     customApiKey: "",
     customApiModel: ""
 };
-
-let hiddenMessagesBuffer = []; // хранит { index, message } для точного возврата
+ 
+let hiddenMessagesBuffer = []; // { index, message } для точного возврата
+let hiddenBufferChatId = null; // чат, которому принадлежит буфер — индексы не переносимы между чатами
 let isScanning = false; // флаг активного скана через generateRaw
-
+ 
+// --- ХЕЛПЕРЫ ---
+ 
+function escapeHtml(text) {
+    return String(text ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+ 
+function getSkipCount() {
+    const raw = parseInt(extension_settings[extensionName].skipCount);
+    return Number.isFinite(raw) && raw >= 2 ? raw : 2;
+}
+ 
+function getScanInterval() {
+    const raw = parseInt(extension_settings[extensionName].scanInterval);
+    return Number.isFinite(raw) && raw >= 1 ? raw : 1;
+}
+ 
+function getCompressAfter() {
+    const raw = parseInt(extension_settings[extensionName].compressAfter);
+    return Number.isFinite(raw) && raw >= 2 ? raw : 20;
+}
+ 
+function getChatArray() {
+    const chat = getContext()?.chat;
+    return Array.isArray(chat) ? chat : null;
+}
+ 
 function updateHideButton() {
     const hasMemory = buildFullContext().length > 0;
     const isHidden = extension_settings[extensionName].isHidden;
@@ -31,65 +63,68 @@ function updateHideButton() {
         $("#fmt_toggle_hide").val(isHidden ? "Show" : "Hide").prop("disabled", false);
     }
 }
-
+ 
 function getCurrentChatId() {
     const context = getContext();
     return context.chatId || null;
 }
-
+ 
 function getCurrentFacts() {
     const chatId = getCurrentChatId();
     if (!chatId) return [];
     return extension_settings[extensionName].factsByChatId[chatId] || [];
 }
-
+ 
 function setCurrentFacts(facts) {
     const chatId = getCurrentChatId();
     if (!chatId) return;
     extension_settings[extensionName].factsByChatId[chatId] = facts;
 }
-
+ 
 function getLastScanned() {
     const chatId = getCurrentChatId();
     if (!chatId) return 0;
     return extension_settings[extensionName].lastScannedByChatId[chatId] || 0;
 }
-
+ 
 function setLastScanned(index) {
     const chatId = getCurrentChatId();
     if (!chatId) return;
     extension_settings[extensionName].lastScannedByChatId[chatId] = index;
 }
-
+ 
 async function callSummarizerLLM(promptText, systemPrompt) {
     const useCustom = extension_settings[extensionName].useCustomProvider;
     if (!useCustom) {
+        // Параметр называется systemPrompt — ключ `system` ядро молча игнорирует.
         return await window.SillyTavern.getContext().generateRaw({
             prompt: promptText,
             quietToLoud: false,
-            system: systemPrompt
+            systemPrompt: systemPrompt
         });
     }
     return await sendCustomProviderRequest(promptText, systemPrompt);
 }
-
+ 
 async function sendCustomProviderRequest(userPrompt, systemPrompt) {
     const apiUrl = extension_settings[extensionName].customApiUrl;
     const apiKey = extension_settings[extensionName].customApiKey;
     const model = extension_settings[extensionName].customApiModel;
-
+ 
     if (!apiUrl || !model) {
         throw new Error("Custom provider URL or model not configured");
     }
-
+ 
     let endpoint = apiUrl.replace(/\/+$/, "");
     if (!endpoint.endsWith("/chat/completions")) {
-        endpoint = endpoint.endsWith("/v1") ? endpoint + "/chat/completions" : endpoint + "/v1/chat/completions";
+        endpoint = /\/v\d+([a-z]*)?$/.test(endpoint) || endpoint.endsWith("/openai")
+            ? endpoint + "/chat/completions"
+            : endpoint + "/v1/chat/completions";
     }
-
+ 
     const headers = { "Content-Type": "application/json" };
     if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
-
+ 
     const response = await fetch(endpoint, {
         method: "POST",
         headers,
@@ -102,18 +137,18 @@ async function sendCustomProviderRequest(userPrompt, systemPrompt) {
             temperature: 0.3
         })
     });
-
+ 
     if (!response.ok) {
         const errText = await response.text().catch(() => "Unknown error");
         throw new Error(`Custom provider request failed (${response.status}): ${errText}`);
     }
-
+ 
     const data = await response.json();
     const content = data?.choices?.[0]?.message?.content;
     if (!content) throw new Error("Custom provider returned empty response");
     return content;
 }
-
+ 
 async function testCustomProviderConnection() {
     try {
         const result = await sendCustomProviderRequest(
@@ -125,48 +160,51 @@ async function testCustomProviderConnection() {
         toastr.error(`Ошибка соединения: ${error.message}`, "Summary Tracker");
     }
 }
-
+ 
 function getLayerSummary() {
     const chatId = getCurrentChatId();
     if (!chatId) return "";
     return extension_settings[extensionName].layerSummaryByChatId[chatId] || "";
 }
-
+ 
 function setLayerSummary(text) {
     const chatId = getCurrentChatId();
     if (!chatId) return;
     extension_settings[extensionName].layerSummaryByChatId[chatId] = text;
 }
-
+ 
 async function maybeCompressFacts() {
-    const compressAfter = parseInt(extension_settings[extensionName].compressAfter) || 20;
+    const compressAfter = getCompressAfter();
     const facts = getCurrentFacts();
     if (facts.length < compressAfter) return;
-
+ 
     const existingLayer = getLayerSummary();
     const promptText = `TASK: Compress the following list of facts into a single concise paragraph that preserves all key story details for context continuity. Do not use markdown, headers, or lists — output plain text only, one paragraph. Write in the same language as the input.\n\nEXISTING COMPRESSED SUMMARY (merge with this, do not repeat, keep or update as needed):\n${existingLayer || "(none yet)"}\n\nNEW FACTS TO COMPRESS:\n${facts.join("\n")}`;
-
+ 
     toastr.info(`Сжатие ${facts.length} фактов в единый саммари...`, "Summary Tracker");
-
+ 
     try {
         const response = await callSummarizerLLM(
             promptText,
             "You are a helpful assistant. Compress the facts into a single concise paragraph. Output only plain text, no markdown, no lists, no headers."
         );
-
-        const compressed = response ? response.trim() : "";
+ 
+        const compressed = typeof response === "string" ? response.trim() : "";
         if (compressed.length > 10) {
             setLayerSummary(compressed);
             setCurrentFacts([]);
             saveSettingsDebounced();
             toastr.success("Саммари сжат!", "Summary Tracker");
+        } else {
+            // Пустой ответ не должен уничтожать накопленные факты.
+            console.warn(`[${extensionName}] Compression returned too short a result, facts kept`);
         }
     } catch (error) {
         console.error(`[${extensionName}] Compression error:`, error);
         toastr.error("Ошибка сжатия", "Summary Tracker");
     }
 }
-
+ 
 function buildFullContext() {
     const layerSummary = getLayerSummary();
     const facts = getCurrentFacts();
@@ -175,52 +213,107 @@ function buildFullContext() {
     if (facts && facts.length > 0) parts.push(facts.join(" "));
     return parts.join(" ");
 }
-
+ 
 // --- ФУНКЦИИ ВИЗУАЛИЗАЦИИ И СКРЫТИЯ ---
-
+ 
 function applyVisualHiding() {
     const context = getContext();
-    const chat = context.chat;
-    const skipCount = parseInt(extension_settings[extensionName].skipCount) || 2;
-    const facts = getCurrentFacts();
+    const chat = getChatArray();
+    if (!chat) {
+        context.setExtensionPrompt(extensionName, "", 1, 9999, false, 0);
+        return;
+    }
+ 
+    const skipCount = getSkipCount();
     const cutOffIndex = chat.length - skipCount;
-    const shouldHide = extension_settings[extensionName].isHidden;
-
+    const fullContext = buildFullContext();
+    // Резать сообщения из контекста можно только когда есть чем их заменить,
+    // иначе получается чистая потеря контекста.
+    const active = extension_settings[extensionName].isHidden && fullContext.length > 0;
+ 
     // Расставляем нашу пометку extra.fmt_skip — не трогаем extra.skip (это призрак пользователя)
     for (let i = 0; i < chat.length; i++) {
         if (!chat[i].extra) chat[i].extra = {};
-        chat[i].extra.fmt_skip = (shouldHide && i < cutOffIndex);
+        chat[i].extra.fmt_skip = (active && i < cutOffIndex);
     }
-
+ 
     // Визуальное скрытие через CSS — не трогаем атрибут is_system (это тоже механизм призрака)
     $(".mes").each(function() {
         const mesId = parseInt($(this).attr("mesid"));
-        if (shouldHide && mesId >= 0 && mesId < cutOffIndex) {
+        if (active && mesId >= 0 && mesId < cutOffIndex) {
             $(this).addClass("fmt-hidden");
         } else {
             $(this).removeClass("fmt-hidden");
         }
     });
-
-    const fullContext = buildFullContext();
-    if (shouldHide && fullContext.length > 0 && cutOffIndex > 0) {
+ 
+    if (active && cutOffIndex > 0) {
         context.setExtensionPrompt(extensionName, fullContext, 1, 9999, false, 0);
     } else {
         context.setExtensionPrompt(extensionName, "", 1, 9999, false, 0);
     }
 }
+ 
+// --- ВЫРЕЗАНИЕ И ВОЗВРАТ СООБЩЕНИЙ ---
+ 
+function stripHiddenMessages() {
+    const chat = getChatArray();
+    if (!chat) return 0;
+ 
+    const toRemove = [];
+    for (let i = chat.length - 1; i >= 0; i--) {
+        if (chat[i].extra && chat[i].extra.fmt_skip === true) {
+            toRemove.push(i);
+        }
+    }
+    if (toRemove.length === 0) return 0;
+ 
+    hiddenMessagesBuffer = toRemove.map(i => ({ index: i, message: chat[i] }));
+    hiddenBufferChatId = getCurrentChatId();
+    for (const i of toRemove) {
+        chat.splice(i, 1);
+    }
+    return hiddenMessagesBuffer.length;
+}
+ 
+function restoreHiddenMessages(reason) {
+    if (hiddenMessagesBuffer.length === 0) return 0;
+ 
+    const chat = getChatArray();
+    // Индексы буфера действительны только для того чата, из которого он собран.
+    if (!chat || hiddenBufferChatId !== getCurrentChatId()) {
+        console.warn(`[${extensionName}] Buffer dropped, chat changed (${reason})`);
+        hiddenMessagesBuffer = [];
+        hiddenBufferChatId = null;
+        return 0;
+    }
+ 
+    const count = hiddenMessagesBuffer.length;
+    // Буфер отсортирован по убыванию индекса — вставляем с конца, от меньшего индекса к большему.
+    for (let j = hiddenMessagesBuffer.length - 1; j >= 0; j--) {
+        const { index, message } = hiddenMessagesBuffer[j];
+        chat.splice(index, 0, message);
+    }
+    hiddenMessagesBuffer = [];
+    hiddenBufferChatId = null;
+    console.log(`[${extensionName}] Restored ${count} messages (${reason})`);
+    return count;
+}
+ 
 // --- ФУНКЦИИ УПРАВЛЕНИЯ ФАКТАМИ ---
-
+ 
 function deleteFact(index) {
     const facts = getCurrentFacts();
     facts.splice(index, 1);
     setCurrentFacts(facts);
+    if (buildFullContext().length === 0) {
+        extension_settings[extensionName].isHidden = false;
+    }
     saveSettingsDebounced();
     renderFacts();
-    renderSummary();
-    toastr.info("Факт удален");
+    toastr.info("Факт удален", "Summary Tracker");
 }
-
+ 
 function editFact(index) {
     const currentFact = getCurrentFacts()[index];
     const newFact = prompt("Редактирование факта:", currentFact);
@@ -230,17 +323,24 @@ function editFact(index) {
         setCurrentFacts(facts);
         saveSettingsDebounced();
         renderFacts();
-        renderSummary();
-        toastr.success("Факт обновлен");
+        toastr.success("Факт обновлен", "Summary Tracker");
     }
 }
-
+ 
 function renderFacts() {
     const listContainer = $("#fmt_facts_list");
     const facts = getCurrentFacts();
-
+ 
     $("#fmt_facts_count").text(facts ? facts.length : 0);
-
+ 
+    // Блок списка фактов в example.html может быть закомментирован — тогда рендер пропускаем.
+    if (listContainer.length === 0) {
+        applyVisualHiding();
+        updateHideButton();
+        renderSummary();
+        return;
+    }
+ 
     if (!facts || facts.length === 0) {
         listContainer.html('<small style="opacity:0.5;">Empty...</small>');
         applyVisualHiding();
@@ -248,12 +348,12 @@ function renderFacts() {
         renderSummary();
         return;
     }
-
+ 
     let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
     facts.forEach((fact, index) => {
         html += `
             <div class="fmt-fact-item" style="display: flex; justify-content: space-between; align-items: flex-start; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.1);">
-                <div class="fmt-fact-text" style="font-size: 0.9em; flex-grow: 1; margin-right: 10px; word-break: break-word; color: #e0e0e0;">${fact}</div>
+                <div class="fmt-fact-text" style="font-size: 0.9em; flex-grow: 1; margin-right: 10px; word-break: break-word; color: #e0e0e0;">${escapeHtml(fact)}</div>
                 <div style="display: flex; gap: 8px; flex-shrink: 0;">
                     <i class="fa-solid fa-pen-to-square fmt-edit-btn" data-index="${index}" style="cursor: pointer; color: #4a9eff; font-size: 0.9em;" title="Редактировать"></i>
                     <i class="fa-solid fa-trash fmt-delete-btn" data-index="${index}" style="cursor: pointer; color: #ff5555; font-size: 0.9em;" title="Удалить"></i>
@@ -262,35 +362,33 @@ function renderFacts() {
     });
     html += '</div>';
     listContainer.html(html);
-
+ 
     $(".fmt-delete-btn").off("click").on("click", function() { deleteFact($(this).data("index")); });
     $(".fmt-edit-btn").off("click").on("click", function() { editFact($(this).data("index")); });
-
+ 
     applyVisualHiding();
     updateHideButton();
     renderSummary();
 }
-
-// --- ЛОГИКА СКАНИРОВАНИЯ ---
-
+ 
 function renderSummary() {
     const container = $("#fmt_summary_combined");
     const combinedText = buildFullContext();
-
+ 
     if (!combinedText) {
         container.html('<small style="opacity:0.5;">Empty...</small>');
         return;
     }
     const html = `
         <div style="display: flex; justify-content: space-between; align-items: flex-start; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.1);">
-            <div id="fmt_summary_text" style="font-size: 0.9em; flex-grow: 1; margin-right: 10px; word-break: break-word; color: #e0e0e0;">${combinedText}</div>
+            <div id="fmt_summary_text" style="font-size: 0.9em; flex-grow: 1; margin-right: 10px; word-break: break-word; color: #e0e0e0;">${escapeHtml(combinedText)}</div>
             <div style="display: flex; gap: 8px; flex-shrink: 0;">
                 <i class="fa-solid fa-pen-to-square" id="fmt_summary_edit_btn" style="cursor: pointer; color: #4a9eff; font-size: 0.9em;" title="Редактировать"></i>
                 <i class="fa-solid fa-trash" id="fmt_summary_delete_btn" style="cursor: pointer; color: #ff5555; font-size: 0.9em;" title="Удалить"></i>
             </div>
         </div>`;
     container.html(html);
-
+ 
     $("#fmt_summary_delete_btn").off("click").on("click", function() {
         if (confirm("Delete summary?")) {
             setCurrentFacts([]);
@@ -298,12 +396,10 @@ function renderSummary() {
             extension_settings[extensionName].isHidden = false;
             saveSettingsDebounced();
             renderFacts();
-            renderSummary();
-            updateHideButton();
-            toastr.info("Summary deleted");
+            toastr.info("Summary deleted", "Summary Tracker");
         }
     });
-
+ 
     $("#fmt_summary_edit_btn").off("click").on("click", function() {
         const current = buildFullContext();
         const edited = prompt("Edit summary:", current);
@@ -312,29 +408,28 @@ function renderSummary() {
             setCurrentFacts([]);
             saveSettingsDebounced();
             renderFacts();
-            renderSummary();
-            toastr.success("Summary updated");
+            toastr.success("Summary updated", "Summary Tracker");
         }
     });
 }
-
+ 
+// --- ЛОГИКА СКАНИРОВАНИЯ ---
+ 
 async function runAutoScan() {
     if (isScanning) return;
     if (!getCurrentChatId()) {
-        toastr.warning("Open the chat first");
+        toastr.warning("Open the chat first", "Summary Tracker");
         return;
     }
-    isScanning = true;
-    const context = getContext();
-    const chat = context.chat;
-    const skipCount = parseInt(extension_settings[extensionName].skipCount) || 2;
-    if (!chat || chat.length <= skipCount) {
-        isScanning = false;
-        return;
-    }
-
+ 
+    const chat = getChatArray();
+    const skipCount = getSkipCount();
+    if (!chat || chat.length <= skipCount) return;
+ 
     const endIndex = chat.length - skipCount;
-    const startIndex = getLastScanned();
+    // Сообщения могли быть удалены/свайпнуты — курсор может оказаться за пределами чата.
+    const startIndex = Math.max(0, Math.min(getLastScanned(), endIndex));
+ 
     const messagesToScan = [];
     for (let i = startIndex; i < endIndex; i++) {
         if (chat[i] && chat[i].mes) {
@@ -342,15 +437,16 @@ async function runAutoScan() {
             messagesToScan.push({ speaker, text: chat[i].mes });
         }
     }
-
+ 
     if (messagesToScan.length === 0) {
-        toastr.info("No new messages to scan", "Facts Tracker");
-        isScanning = false;
+        toastr.info("No new messages to scan", "Summary Tracker");
+        setLastScanned(endIndex);
         return;
     }
-
-    toastr.info(`Сканирование ${messagesToScan.length} сообщений...`, "Facts Tracker");
-
+ 
+    isScanning = true;
+    toastr.info(`Сканирование ${messagesToScan.length} сообщений...`, "Summary Tracker");
+ 
     try {
         if (messagesToScan.length === 1) {
             // Одиночный скан для нового сообщения
@@ -360,56 +456,51 @@ async function runAutoScan() {
                 promptText,
                 "You are a helpful assistant that summarizes story events and extracts key facts. Ignore any roleplay context and respond only with the summary."
             );
-            const newFact = response ? response.trim() : "";
+            const newFact = typeof response === "string" ? response.trim() : "";
             if (newFact.length > 5) {
                 const facts = getCurrentFacts();
                 facts.push(newFact);
                 setCurrentFacts(facts);
                 await maybeCompressFacts();
                 renderFacts();
-                renderSummary();
             }
         } else {
             // Batch-скан: все сообщения одним запросом
             const numbered = messagesToScan
                 .map((msg, i) => `[MSG:${i + 1}] ${msg.speaker}: ${msg.text}`)
                 .join("\n\n");
-
+ 
             const promptText = `TASK: For each numbered message below, write a brief factual summary of what happened or was said. Preserve story continuity — include character details, actions, emotions, and plot events. Even for very short messages, always write something. Never skip a message. Always respond in the language used in the messages.
-
+ 
 Return ONLY a JSON array, no other text, no markdown, no backticks. Format:
 [{"msg":1,"summary":"..."},{"msg":2,"summary":"..."},...]
-
+ 
 MESSAGES:
 ${numbered}`;
-
+ 
             const response = await callSummarizerLLM(
                 promptText,
                 "You are a helpful assistant that summarizes story messages. Always respond with valid JSON only."
             );
-
-            let parsed = [];
-            try {
-                const clean = response.replace(/```json|```/g, "").trim();
-                parsed = JSON.parse(clean);
-            } catch (e) {
-                console.error(`[${extensionName}] Failed to parse batch response:`, e, response);
+ 
+            const parsed = parseBatchResponse(response);
+            if (parsed === null) {
                 toastr.error("Ошибка парсинга ответа", "Summary Tracker");
                 return;
             }
-
+ 
             const facts = getCurrentFacts();
             for (const item of parsed) {
-                if (item.summary && item.summary.trim().length > 5) {
-                    facts.push(item.summary.trim());
+                const summary = item && typeof item.summary === "string" ? item.summary.trim() : "";
+                if (summary.length > 5) {
+                    facts.push(summary);
                 }
             }
             setCurrentFacts(facts);
             await maybeCompressFacts();
             renderFacts();
-            renderSummary();
         }
-
+ 
         setLastScanned(endIndex);
         saveSettingsDebounced();
         toastr.success("Готово!", "Summary Tracker");
@@ -420,125 +511,153 @@ ${numbered}`;
         isScanning = false;
     }
 }
-
+ 
+/**
+ * Возвращает массив элементов саммари или null, если ответ разобрать не удалось.
+ */
+function parseBatchResponse(response) {
+    if (typeof response !== "string" || response.trim() === "") {
+        console.error(`[${extensionName}] Batch response is empty or not a string:`, response);
+        return null;
+    }
+ 
+    let clean = response.replace(/```json|```/g, "").trim();
+    // Модель часто добавляет текст до/после массива — вырезаем сам массив.
+    const first = clean.indexOf("[");
+    const last = clean.lastIndexOf("]");
+    if (first !== -1 && last > first) {
+        clean = clean.slice(first, last + 1);
+    }
+ 
+    let parsed;
+    try {
+        parsed = JSON.parse(clean);
+    } catch (e) {
+        console.error(`[${extensionName}] Failed to parse batch response:`, e, response);
+        return null;
+    }
+ 
+    if (Array.isArray(parsed)) return parsed;
+    // Иногда приходит одиночный объект вместо массива.
+    if (parsed && typeof parsed === "object" && typeof parsed.summary === "string") return [parsed];
+ 
+    console.error(`[${extensionName}] Batch response is not an array:`, parsed);
+    return null;
+}
+ 
 async function handleChatEvent() {
     if (!extension_settings[extensionName].autoScan) return;
-    const chat = getContext().chat;
+    const chat = getChatArray();
     if (!chat || chat.length === 0) return;
-    const scanInterval = parseInt(extension_settings[extensionName].scanInterval) || 1;
-    const skipCount = parseInt(extension_settings[extensionName].skipCount) || 2;
+    const scanInterval = getScanInterval();
+    const skipCount = getSkipCount();
     const endIndex = chat.length - skipCount;
-    const lastScanned = getLastScanned();
+    if (endIndex <= 0) return;
+    const lastScanned = Math.max(0, Math.min(getLastScanned(), endIndex));
     if ((endIndex - lastScanned) >= scanInterval) {
         await runAutoScan();
     }
 }
-
+ 
 // --- ИНИЦИАЛИЗАЦИЯ ---
-
+ 
 function updateMaxSkip() {
-    const chatLength = getContext().chat?.length || 0;
+    const chatLength = getChatArray()?.length || 0;
     $("#fmt_skip_count").attr("max", chatLength);
 }
-
+ 
 function loadSettings() {
     extension_settings[extensionName] = extension_settings[extensionName] || {};
-    if (Object.keys(extension_settings[extensionName]).length === 0) {
-        Object.assign(extension_settings[extensionName], defaultSettings);
+    const settings = extension_settings[extensionName];
+ 
+    // Поключевое слияние: старые установки расширения не пересоздаются с нуля,
+    // но получают недостающие поля новых версий.
+    for (const [key, value] of Object.entries(defaultSettings)) {
+        if (settings[key] === undefined) {
+            settings[key] = (value && typeof value === "object") ? structuredClone(value) : value;
+        }
     }
-    if (!extension_settings[extensionName].factsByChatId) {
-        extension_settings[extensionName].factsByChatId = {};
+ 
+    $("#fmt_auto_scan").prop("checked", settings.autoScan);
+    $("#fmt_skip_count").val(getSkipCount());
+    $("#fmt_scan_interval").val(getScanInterval());
+    $("#fmt_compress_after").val(getCompressAfter());
+    $("#fmt_use_custom_provider").prop("checked", settings.useCustomProvider);
+    $("#fmt_custom_api_url").val(settings.customApiUrl);
+    $("#fmt_custom_api_key").val(settings.customApiKey);
+    $("#fmt_custom_api_model").val(settings.customApiModel);
+    $("#fmt_custom_provider_panel").css("display", settings.useCustomProvider ? "block" : "none");
+ 
+    const autoEnabled = settings.autoScan;
+    $("#fmt_scan_interval").prop("disabled", !autoEnabled);
+    $("#fmt_scan_interval_row").css("display", autoEnabled ? "flex" : "none");
+ 
+    if (buildFullContext().length === 0) {
+        settings.isHidden = false;
     }
-    if (!extension_settings[extensionName].lastScannedByChatId) {
-        extension_settings[extensionName].lastScannedByChatId = {};
-    }
-    if (!extension_settings[extensionName].layerSummaryByChatId) {
-        extension_settings[extensionName].layerSummaryByChatId = {};
-    }
-    if (extension_settings[extensionName].isHidden === undefined) {
-        extension_settings[extensionName].isHidden = false;
-    }
-    $("#fmt_auto_scan").prop("checked", extension_settings[extensionName].autoScan);
-    $("#fmt_skip_count").val(extension_settings[extensionName].skipCount || 2);
-    $("#fmt_scan_interval").val(extension_settings[extensionName].scanInterval || 1);
-    $("#fmt_compress_after").val(extension_settings[extensionName].compressAfter || 20);
-    $("#fmt_use_custom_provider").prop("checked", extension_settings[extensionName].useCustomProvider || false);
-    $("#fmt_custom_api_url").val(extension_settings[extensionName].customApiUrl || "");
-    $("#fmt_custom_api_key").val(extension_settings[extensionName].customApiKey || "");
-    $("#fmt_custom_api_model").val(extension_settings[extensionName].customApiModel || "");
-    $("#fmt_custom_provider_panel").css("display", extension_settings[extensionName].useCustomProvider ? "block" : "none");
-    const autoEnabled = extension_settings[extensionName].autoScan;
-    setTimeout(() => {
-        $("#fmt_scan_interval").prop("disabled", !autoEnabled);
-        $("#fmt_scan_interval_row").css("display", autoEnabled ? "flex" : "none");
-    }, 100);
-    if (extension_settings[extensionName].isHidden === undefined) {
-        extension_settings[extensionName].isHidden = false;
-    }
+ 
     updateMaxSkip();
     renderFacts();
-    renderSummary();
-    if (buildFullContext().length === 0) {
-        extension_settings[extensionName].isHidden = false;
-    }
-    applyVisualHiding();
-    updateHideButton();
 }
-    
+ 
 jQuery(async () => {
     try {
         const settingsHtml = await $.get(`${extensionFolderPath}/example.html`);
         $("#extensions_settings2").append(settingsHtml);
-       
+ 
         $("#fmt_auto_scan").on("input", (e) => {
-            extension_settings[extensionName].autoScan = Boolean($(e.target).prop("checked"));
+            const checked = Boolean($(e.target).prop("checked"));
+            extension_settings[extensionName].autoScan = checked;
             saveSettingsDebounced();
+            $("#fmt_scan_interval").prop("disabled", !checked);
+            $("#fmt_scan_interval_row").css("display", checked ? "flex" : "none");
         });
-
+ 
         $("#fmt_skip_count").on("input", (e) => {
-            let val = parseInt($(e.target).val()) || 2;
-            extension_settings[extensionName].skipCount = val;
+            const raw = parseInt($(e.target).val());
+            extension_settings[extensionName].skipCount = Number.isFinite(raw) && raw >= 2 ? raw : 2;
             saveSettingsDebounced();
             applyVisualHiding();
         });
-
+ 
         $("#fmt_scan_interval").on("input", (e) => {
-            let val = parseInt($(e.target).val()) || 1;
-            extension_settings[extensionName].scanInterval = val;
+            const raw = parseInt($(e.target).val());
+            extension_settings[extensionName].scanInterval = Number.isFinite(raw) && raw >= 1 ? raw : 1;
             saveSettingsDebounced();
         });
-
+ 
         $("#fmt_compress_after").on("input", (e) => {
-            let val = parseInt($(e.target).val()) || 20;
-            extension_settings[extensionName].compressAfter = val;
+            const raw = parseInt($(e.target).val());
+            extension_settings[extensionName].compressAfter = Number.isFinite(raw) && raw >= 2 ? raw : 20;
             saveSettingsDebounced();
         });
-
+ 
         $("#fmt_use_custom_provider").on("input", (e) => {
             const checked = Boolean($(e.target).prop("checked"));
             extension_settings[extensionName].useCustomProvider = checked;
             saveSettingsDebounced();
             $("#fmt_custom_provider_panel").css("display", checked ? "block" : "none");
         });
-
+ 
         $("#fmt_custom_api_url").on("input", (e) => {
             extension_settings[extensionName].customApiUrl = $(e.target).val().trim();
             saveSettingsDebounced();
         });
-
+ 
         $("#fmt_custom_api_key").on("input", (e) => {
             extension_settings[extensionName].customApiKey = $(e.target).val().trim();
             saveSettingsDebounced();
         });
-
+ 
         $("#fmt_custom_api_model").on("input", (e) => {
             extension_settings[extensionName].customApiModel = $(e.target).val().trim();
             saveSettingsDebounced();
         });
-
+ 
         $("#fmt_test_custom_provider").on("click", testCustomProviderConnection);
-
+ 
         $("#fmt_manual_scan").on("click", runAutoScan);
+ 
         $("#fmt_clear_facts").on("click", () => {
             if (confirm("Очистить всё?")) {
                 setCurrentFacts([]);
@@ -547,90 +666,95 @@ jQuery(async () => {
                 extension_settings[extensionName].isHidden = false;
                 saveSettingsDebounced();
                 renderFacts();
-                renderSummary();
-                updateHideButton();
             }
         });
-
+ 
         $("#fmt_toggle_hide").on("click", () => {
             if (buildFullContext().length === 0) return;
-            const isHidden = !extension_settings[extensionName].isHidden;
-            extension_settings[extensionName].isHidden = isHidden;
+            extension_settings[extensionName].isHidden = !extension_settings[extensionName].isHidden;
             saveSettingsDebounced();
             applyVisualHiding();
             updateHideButton();
         });
-       
+ 
         loadSettings();
-
-        eventSource.on("generation_started", (data, _extraData, isDryRun) => {
+ 
+        eventSource.on(event_types.GENERATION_STARTED, (data, _extraData, isDryRun) => {
             if (isScanning) return;
-            if (hiddenMessagesBuffer.length > 0) return;
             if (isDryRun) return;
-            const context = getContext();
-            const chat = context.chat;
-            const toRemove = [];
-            for (let i = chat.length - 1; i >= 0; i--) {
-                if (chat[i].extra && chat[i].extra.fmt_skip === true) {
-                    toRemove.push(i);
-                }
-            }
-            hiddenMessagesBuffer = toRemove.map(i => ({ index: i, message: chat[i] }));
-            for (const i of toRemove) {
-                chat.splice(i, 1);
-            }
+            if (hiddenMessagesBuffer.length > 0) return;
+            stripHiddenMessages();
         });
-
-        eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, async () => {
-            if (hiddenMessagesBuffer.length > 0) {
-                const bufferLength = hiddenMessagesBuffer.length;
-                const context = getContext();
-                const chat = context.chat;
-                for (let j = hiddenMessagesBuffer.length - 1; j >= 0; j--) {
-                    const { index, message } = hiddenMessagesBuffer[j];
-                    chat.splice(index, 0, message);
-                }
-                hiddenMessagesBuffer = [];
-
+ 
+        eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, () => {
+            const bufferLength = restoreHiddenMessages("message rendered");
+ 
+            if (bufferLength > 0) {
+                // ST пронумеровал новое сообщение по укороченному чату — чиним дубли mesid.
                 const mesidSeen = new Set();
-                 $('.mes').each(function() {
-                     const mesidAttr = $(this).attr('mesid');
-                     if (mesidAttr === undefined || mesidAttr === '') return;
-                     const mesid = parseInt(mesidAttr);
-                     if (mesidSeen.has(mesid)) {
-                         $(this).attr('mesid', mesid + bufferLength);
-                     } else {
-                         mesidSeen.add(mesid);
-                     }
+                $('.mes').each(function() {
+                    const mesidAttr = $(this).attr('mesid');
+                    if (mesidAttr === undefined || mesidAttr === '') return;
+                    const mesid = parseInt(mesidAttr);
+                    if (mesidSeen.has(mesid)) {
+                        $(this).attr('mesid', mesid + bufferLength);
+                    } else {
+                        mesidSeen.add(mesid);
+                    }
                 });
             }
-            await handleChatEvent();
+ 
             applyVisualHiding();
+            // Не блокируем пайплайн ST: он ждёт этот обработчик перед сохранением чата.
+            handleChatEvent().catch(err => console.error(`[${extensionName}] Auto-scan failed:`, err));
         });
-
-        eventSource.on("generation_stopped", () => {
-            if (hiddenMessagesBuffer.length > 0) {
-                const context = getContext();
-                const chat = context.chat;
-                for (let j = hiddenMessagesBuffer.length - 1; j >= 0; j--) {
-                    const { index, message } = hiddenMessagesBuffer[j];
-                    chat.splice(index, 0, message);
-                }
-                hiddenMessagesBuffer = [];
+ 
+        eventSource.on(event_types.GENERATION_STOPPED, () => {
+            if (restoreHiddenMessages("generation stopped") > 0) {
                 applyVisualHiding();
-                console.log(`[${extensionName}] Messages restored after generation stopped`);
             }
         });
-
-        eventSource.on(event_types.MESSAGE_RECEIVED, updateMaxSkip);
-        eventSource.on(event_types.CHAT_COMPLETED, applyVisualHiding);
-        eventSource.on(event_types.CHAT_CHANGED, () => {
-            renderFacts();
-            renderSummary();
-            applyVisualHiding();
+ 
+        // Страховка: срабатывает и когда генерация упала с ошибкой и ни одно
+        // сообщение не отрендерилось. Без неё вырезанные сообщения теряются навсегда.
+        eventSource.on(event_types.GENERATION_ENDED, () => {
+            if (restoreHiddenMessages("generation ended") > 0) {
+                applyVisualHiding();
+            }
         });
-        
-        console.log(`[${extensionName}] ✅ Full Control Loaded`);
+ 
+        eventSource.on(event_types.MESSAGE_RECEIVED, updateMaxSkip);
+ 
+        eventSource.on(event_types.CHAT_CHANGED, () => {
+            // Индексы буфера принадлежат старому чату — переносить их нельзя.
+            hiddenMessagesBuffer = [];
+            hiddenBufferChatId = null;
+            if (buildFullContext().length === 0) {
+                extension_settings[extensionName].isHidden = false;
+            }
+            updateMaxSkip();
+            renderFacts();
+        });
+ 
+        // Отладочный API для проверки сценариев из консоли DevTools.
+        window.SummaryTracker = {
+            version: "1.1.0",
+            get settings() { return extension_settings[extensionName]; },
+            get isScanning() { return isScanning; },
+            getHiddenBuffer: () => hiddenMessagesBuffer,
+            getHiddenBufferChatId: () => hiddenBufferChatId,
+            getCurrentChatId, getCurrentFacts, setCurrentFacts,
+            getLastScanned, setLastScanned,
+            getLayerSummary, setLayerSummary, buildFullContext,
+            getSkipCount, getScanInterval, getCompressAfter,
+            escapeHtml, parseBatchResponse,
+            stripHiddenMessages, restoreHiddenMessages,
+            applyVisualHiding, renderFacts, renderSummary, updateHideButton, loadSettings,
+            runAutoScan, maybeCompressFacts, handleChatEvent,
+            callSummarizerLLM, sendCustomProviderRequest, testCustomProviderConnection
+        };
+ 
+        console.log(`[${extensionName}] ✅ Loaded (v1.1.0). Debug API: window.SummaryTracker`);
     } catch (error) {
         console.error(`[${extensionName}] ❌ Load failed:`, error);
     }
