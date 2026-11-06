@@ -10,6 +10,8 @@ A minimalist extension that hides messages from the context and extracts their e
 
 ### Fixed & Added
 
+* **v1.5.0** — floating heart button. A small circle with a heart icon sits on the main screen; tapping it opens the extension panel (settings, saved facts and the summary, with editing) in a window, so you no longer have to go through the Extensions menu. The panel is moved into the window and put back on close, so everything works exactly the same in both places. Close it with the × button, Esc or by tapping the dimmed background. The button can be turned off with the new checkbox **Show floating heart button** (on by default, including for existing installs); the panel stays available in the Extensions menu either way
+* **v1.4.0** — new optional setting **Summary size, tokens**. When a number is entered, the request that compresses facts into the final summary asks the model to land at roughly that many tokens. Leave it empty for no limit (the prompt is then exactly the same as before). The model only approximates token counts, so treat it as a soft target. The limit applies to the compression step only: per-message scan prompts and the text injected into your roleplay prompt are not changed. With a custom provider the response cap (`max_tokens`) is raised automatically for large limits so the paragraph is not cut off
 * **v1.3.0** — memory moved out of the global settings file into the chat's own `chat_metadata`. Facts now travel with the chat: renaming a chat no longer wipes them, two characters with identically named chat files no longer share memory, and exporting a chat carries its summary along. Data saved by v1.2.0 is migrated automatically the first time you open each chat
 * **v1.3.0** — the scan cursor can only move forward. Raising "Leave messages" used to rewind it and re-summarize the same messages
 * **v1.3.0** — if the model returns fewer summaries than the batch contained, the cursor stops at the last confirmed one and you get a warning. Previously the missing messages were dropped from memory silently
@@ -43,7 +45,7 @@ SillyTavern builds the text it scans for World Info from the same trimmed copy t
 
 Since v1.3.0 facts and the scan cursor live in the chat's own `chat_metadata`, i.e. inside the chat file itself. They survive a rename, they are never shared between two chats that happen to have the same file name, and they are included when you export the chat. Memory saved by v1.2.0 in `settings.json` is migrated on first open of each chat and removed from the settings file.
 
-Global options (auto-scan, auto-hide, "leave messages", scan interval, compression threshold, custom provider) stay in `settings.json` as before. Note that the custom provider API key is stored there in plain text and ends up in a settings export.
+Global options (auto-scan, auto-hide, "leave messages", scan interval, compression threshold, summary size limit, custom provider) stay in `settings.json` as before. Note that the custom provider API key is stored there in plain text and ends up in a settings export.
 
 ### Installation
 
@@ -79,6 +81,8 @@ My Telegram-channel: [@sillytavern1](https://t.me/sillytavern1)
 
 ### Исправлено и добавлено
 
+* **v1.5.0** — плавающая кнопка-сердечко. Маленький кружок с сердцем на главном экране: по нажатию открывается панель расширения (настройки, сохранённые факты и саммари с возможностью правки) в отдельном окне, и больше не нужно заходить через меню расширений. Панель переносится в окно и при закрытии возвращается на место, поэтому всё работает одинаково и там, и там. Закрыть можно крестиком, клавишей Esc или нажатием на затемнённый фон. Кнопку можно отключить новой галочкой **Show floating heart button** (по умолчанию включена, в том числе у уже установленных копий); из меню расширений панель доступна в любом случае
+* **v1.4.0** — новая необязательная настройка **Summary size, tokens**. Если указать число, то запрос, который сжимает факты в итоговый саммари, просит модель уложиться примерно в это количество токенов. Пустое поле — без ограничения (промпт тогда ровно такой же, как раньше). Модели считают токены лишь приблизительно, поэтому это мягкая цель, а не жёсткий лимит. Лимит действует только на шаге сжатия: промпты обычного скана по сообщениям и текст, который уходит в промпт ролевой модели, не меняются. При кастомном провайдере потолок ответа (`max_tokens`) для больших лимитов поднимается автоматически, чтобы абзац не обрывался
 * **v1.3.0** — память переехала из общего файла настроек в `chat_metadata` самого чата. Теперь факты живут вместе с чатом: переименование чата их больше не стирает, два персонажа с одинаковым именем файла чата больше не делят одну память, а при экспорте чата саммари уезжает вместе с ним. Данные, накопленные в v1.2.0, переносятся автоматически при первом открытии каждого чата
 * **v1.3.0** — курсор сканирования может только идти вперёд. Раньше увеличение «Leave messages» откатывало его назад, и одни и те же сообщения суммаризировались повторно
 * **v1.3.0** — если модель вернула меньше саммари, чем было сообщений в пачке, курсор останавливается на последнем подтверждённом, и показывается предупреждение. Раньше недостающие сообщения молча выпадали из памяти
@@ -124,7 +128,7 @@ My Telegram-channel: [@sillytavern1](https://t.me/sillytavern1)
 
 С v1.3.0 факты и курсор сканирования хранятся в `chat_metadata` конкретного чата, то есть внутри самого файла чата. Они переживают переименование, никогда не смешиваются между чатами с одинаковым именем файла и уезжают вместе с чатом при экспорте. Память, накопленная в v1.2.0 в `settings.json`, переносится при первом открытии чата и удаляется из файла настроек.
 
-Глобальные настройки (автоскан, автоскрытие, «оставить N последних», интервал скана, порог сжатия, кастомный провайдер) по-прежнему живут в `settings.json`. Учтите, что ключ кастомного провайдера хранится там открытым текстом и попадает в экспорт настроек.
+Глобальные настройки (автоскан, автоскрытие, «оставить N последних», интервал скана, порог сжатия, лимит размера саммари, кастомный провайдер) по-прежнему живут в `settings.json`. Учтите, что ключ кастомного провайдера хранится там открытым текстом и попадает в экспорт настроек.
 
 ### Проверка, что всё работает
 
