@@ -1,4 +1,4 @@
-# Summary Tracker (in process)
+# Summary Tracker
 
 ## Eng ReadMe
 
