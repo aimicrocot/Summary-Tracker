@@ -31,12 +31,6 @@
             </div>
 
             <div class="fmt-row">
-                <label for="fmt_summary_token_limit">Summary size, tokens:</label>
-                <input id="fmt_summary_token_limit" class="text_bg fmt-number-input" type="number" min="50" step="50" placeholder="off" />
-            </div>
-            <small class="fmt-hint">Optional (minimum 50). Leave blank for no restrictions.</small>
-
-            <div class="fmt-row">
                 <input id="fmt_use_custom_provider" type="checkbox" />
                 <label for="fmt_use_custom_provider" style="margin-left: 5px;">Use custom provider for summarization</label>
             </div>
@@ -49,7 +43,7 @@
                 <div class="fmt-field">
                     <label for="fmt_custom_api_key">API Key:</label>
                     <input id="fmt_custom_api_key" class="text_bg fmt-text-input" type="password" autocomplete="off" />
-                    <small class="fmt-hint">settings.json</small>
+                    <small class="fmt-hint">Хранится в settings.json открытым текстом и попадает в экспорт настроек.</small>
                 </div>
                 <div class="fmt-field">
                     <label for="fmt_custom_api_model">Model:</label>

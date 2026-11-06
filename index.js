@@ -2,7 +2,7 @@ import { extension_settings, getContext } from "../../../extensions.js";
 import { saveSettingsDebounced, eventSource, event_types } from "../../../../script.js";
 
 const extensionName = "Summary-Tracker";
-const extensionVersion = "1.5.0";
+const extensionVersion = "1.3.0";
 
 // Папка на диске задаёт путь к статике, а не название расширения: установка через
 // Extensions → Install даёт "Summary-Tracker", а ZIP с GitHub распаковывается в
@@ -27,9 +27,6 @@ const SCAN_CHUNK_CHARS = 24000;
 // fallback-факт на всю партию считается за единицу и иначе рос бы бесконечно.
 const COMPRESS_CHARS = 8000;
 const CUSTOM_REQUEST_TIMEOUT_MS = 60000;
-const CUSTOM_MAX_TOKENS = 2048;
-// Ниже этого значения лимит не имеет смысла: абзац на 10 токенов не вместит даже одного факта.
-const MIN_SUMMARY_TOKEN_LIMIT = 50;
 
 const defaultSettings = {
     autoScan: false,
@@ -37,10 +34,6 @@ const defaultSettings = {
     skipCount: 2,
     scanInterval: 1,
     compressAfter: 20,
-    // Желаемый размер итогового (сжатого) саммари в токенах. 0 — лимит не задан.
-    summaryTokenLimit: 0,
-    // Плавающая кнопка-сердечко, открывающая панель расширения. По умолчанию показана.
-    showFloatingButton: true,
     useCustomProvider: false,
     customApiUrl: "",
     customApiKey: "",
@@ -85,12 +78,6 @@ function getScanInterval() {
 function getCompressAfter() {
     const raw = parseInt(extension_settings[extensionName].compressAfter);
     return Number.isFinite(raw) && raw >= 2 ? raw : 20;
-}
-
-// 0 означает «не задано»: тогда промпт сжатия остаётся ровно таким же, как до 1.4.0.
-function getSummaryTokenLimit() {
-    const raw = parseInt(extension_settings[extensionName].summaryTokenLimit);
-    return Number.isFinite(raw) && raw >= MIN_SUMMARY_TOKEN_LIMIT ? raw : 0;
 }
 
 function getChatArray() {
@@ -309,7 +296,7 @@ function pruneEmptyChats() {
 
 // --- ЗАПРОСЫ К СУММАРИЗАТОРУ ---
 
-async function callSummarizerLLM(promptText, systemPrompt, maxTokens) {
+async function callSummarizerLLM(promptText, systemPrompt) {
     if (!extension_settings[extensionName].useCustomProvider) {
         // Параметр называется systemPrompt — ключ `system` ядро молча игнорирует.
         // generateRaw не проходит через Generate(), поэтому свой же интерцептор
@@ -320,12 +307,10 @@ async function callSummarizerLLM(promptText, systemPrompt, maxTokens) {
             systemPrompt: systemPrompt
         });
     }
-    return await sendCustomProviderRequest(promptText, systemPrompt, maxTokens);
+    return await sendCustomProviderRequest(promptText, systemPrompt);
 }
 
-// maxTokens — потолок ответа. Лимит саммари поднимает его, чтобы длинный абзац не обрезался
-// посреди предложения; без лимита остаётся прежние 2048.
-async function sendCustomProviderRequest(userPrompt, systemPrompt, maxTokens = CUSTOM_MAX_TOKENS) {
+async function sendCustomProviderRequest(userPrompt, systemPrompt) {
     const apiUrl = extension_settings[extensionName].customApiUrl;
     const apiKey = extension_settings[extensionName].customApiKey;
     const model = extension_settings[extensionName].customApiModel;
@@ -362,7 +347,7 @@ async function sendCustomProviderRequest(userPrompt, systemPrompt, maxTokens = C
                     { role: "user", content: userPrompt }
                 ],
                 temperature: 0.3,
-                max_tokens: maxTokens
+                max_tokens: 2048
             })
         });
     } catch (error) {
@@ -404,26 +389,17 @@ function shouldCompressFacts(facts) {
     return facts.reduce((sum, fact) => sum + fact.length, 0) >= COMPRESS_CHARS;
 }
 
-// Модель плохо считает токены, поэтому просим «примерно» и не требуем жёсткой точности.
-// Если лимит не задан, возвращает пустую строку — и промпт не меняется вовсе.
-function buildSummarySizeInstruction(limit) {
-    if (!limit) return "";
-    return ` The final paragraph must be approximately ${limit} tokens long. Treat this as a soft target: stay close to it, keep the most important story details if you have to cut something, and do not pad the text with filler if the content is naturally shorter.`;
-}
-
 async function maybeCompressFacts(state) {
     if (!shouldCompressFacts(state.facts)) return;
 
-    const tokenLimit = getSummaryTokenLimit();
-    const promptText = `TASK: Compress the following list of facts into a single concise paragraph that preserves all key story details for context continuity. Do not use markdown, headers, or lists — output plain text only, one paragraph. Write in the same language as the input.${buildSummarySizeInstruction(tokenLimit)}\n\nEXISTING COMPRESSED SUMMARY (merge with this, do not repeat, keep or update as needed):\n${state.layerSummary || "(none yet)"}\n\nNEW FACTS TO COMPRESS:\n${state.facts.join("\n")}`;
+    const promptText = `TASK: Compress the following list of facts into a single concise paragraph that preserves all key story details for context continuity. Do not use markdown, headers, or lists — output plain text only, one paragraph. Write in the same language as the input.\n\nEXISTING COMPRESSED SUMMARY (merge with this, do not repeat, keep or update as needed):\n${state.layerSummary || "(none yet)"}\n\nNEW FACTS TO COMPRESS:\n${state.facts.join("\n")}`;
 
     toastr.info(`Сжатие ${state.facts.length} фактов в единый саммари...`, "Summary Tracker");
 
     try {
         const response = await callSummarizerLLM(
             promptText,
-            "You are a helpful assistant. Compress the facts into a single concise paragraph. Output only plain text, no markdown, no lists, no headers.",
-            tokenLimit ? Math.max(CUSTOM_MAX_TOKENS, Math.ceil(tokenLimit * 1.5)) : undefined
+            "You are a helpful assistant. Compress the facts into a single concise paragraph. Output only plain text, no markdown, no lists, no headers."
         );
 
         const compressed = typeof response === "string" ? response.trim() : "";
@@ -899,96 +875,6 @@ async function handleChatEvent() {
     }
 }
 
-// --- ПЛАВАЮЩАЯ КНОПКА И ОКНО С ПАНЕЛЬЮ ---
-
-// Прячем только при явном false: у старых установок поля нет, и кнопка для них показана.
-function isFloatingButtonEnabled() {
-    return extension_settings[extensionName]?.showFloatingButton !== false;
-}
-
-function applyFloatingButtonVisibility() {
-    // Свой класс, а не fmt-hidden: тот уже используется для скрытия сообщений в чате.
-    $("#fmt_floating_button").toggleClass("fmt-float-off", !isFloatingButtonEnabled());
-}
-
-let isSummaryModalOpen = false;
-
-function openSummaryModal() {
-    if (isSummaryModalOpen) return;
-
-    const panel = $(".summary-tracker-settings").first();
-    if (!panel.length) {
-        if (typeof toastr !== "undefined") toastr.error("Панель настроек не найдена", "Summary Tracker");
-        return;
-    }
-
-    // Переносим саму панель, а не копию: обработчики, редактор саммари и id остаются
-    // теми же. Метка на её месте нужна, чтобы вернуть панель в меню расширений.
-    panel.before('<div id="fmt_settings_home" style="display: none;"></div>');
-    $("#fmt_modal_body").append(panel);
-    $("#fmt_modal_overlay").removeClass("fmt-float-off");
-    isSummaryModalOpen = true;
-}
-
-function closeSummaryModal() {
-    if (!isSummaryModalOpen) return;
-
-    const panel = $(".summary-tracker-settings").first();
-    const home = $("#fmt_settings_home");
-    if (panel.length) {
-        if (home.length) home.replaceWith(panel);
-        else $("#extensions_settings2").append(panel);
-    }
-    home.remove();
-
-    $("#fmt_modal_overlay").addClass("fmt-float-off");
-    isSummaryModalOpen = false;
-
-    if (isFloatingButtonEnabled()) $("#fmt_floating_button").trigger("focus");
-}
-
-function setupFloatingUi() {
-    $("body").append(`
-        <div id="fmt_floating_button" class="fmt-floating-button" role="button" tabindex="0" title="Summary Tracker" aria-label="Summary Tracker">
-            <i class="fa-solid fa-heart"></i>
-        </div>
-        <div id="fmt_modal_overlay" class="fmt-modal-overlay fmt-float-off">
-            <div class="fmt-modal" role="dialog" aria-modal="true" aria-label="Summary Tracker">
-                <div class="fmt-modal-header">
-                    <b>Summary Tracker</b>
-                    <i id="fmt_modal_close" class="fa-solid fa-xmark fmt-modal-close" role="button" tabindex="0" title="Close" aria-label="Close"></i>
-                </div>
-                <div id="fmt_modal_body" class="fmt-modal-body"></div>
-            </div>
-        </div>`);
-
-    const onActivateKey = (handler) => (e) => {
-        if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            handler();
-        }
-    };
-
-    $("#fmt_floating_button")
-        .on("click", () => openSummaryModal())
-        .on("keydown", onActivateKey(openSummaryModal));
-
-    $("#fmt_modal_close")
-        .on("click", () => closeSummaryModal())
-        .on("keydown", onActivateKey(closeSummaryModal));
-
-    // Клик по затемнению закрывает окно, клик внутри окна — нет.
-    $("#fmt_modal_overlay").on("click", (e) => {
-        if (e.target === e.currentTarget) closeSummaryModal();
-    });
-
-    $(document).on("keydown", (e) => {
-        if (isSummaryModalOpen && e.key === "Escape") closeSummaryModal();
-    });
-
-    applyFloatingButtonVisibility();
-}
-
 // --- ИНИЦИАЛИЗАЦИЯ ---
 
 function loadSettings() {
@@ -1012,11 +898,9 @@ function loadSettings() {
 
     $("#fmt_auto_scan").prop("checked", settings.autoScan);
     $("#fmt_auto_hide").prop("checked", settings.autoHide);
-    $("#fmt_show_floating_button").prop("checked", isFloatingButtonEnabled());
     $("#fmt_skip_count").val(getSkipCount());
     $("#fmt_scan_interval").val(getScanInterval());
     $("#fmt_compress_after").val(getCompressAfter());
-    $("#fmt_summary_token_limit").val(getSummaryTokenLimit() || "");
     $("#fmt_use_custom_provider").prop("checked", settings.useCustomProvider);
     $("#fmt_custom_api_url").val(settings.customApiUrl);
     $("#fmt_custom_api_key").val(settings.customApiKey);
@@ -1049,26 +933,6 @@ function bindNumberSetting(selector, key, minimum) {
     });
 }
 
-// В отличие от bindNumberSetting, пустое поле здесь осмысленно: оно значит «лимита нет».
-function bindOptionalNumberSetting(selector, key, minimum) {
-    $(selector).on("input", (e) => {
-        const text = String($(e.target).val() ?? "").trim();
-        if (text === "") {
-            extension_settings[extensionName][key] = 0;
-            saveSettingsDebounced();
-            return;
-        }
-        const raw = parseInt(text);
-        if (!Number.isFinite(raw) || raw < minimum) return;
-        extension_settings[extensionName][key] = raw;
-        saveSettingsDebounced();
-    });
-
-    $(selector).on("blur", () => {
-        $(selector).val(extension_settings[extensionName][key] || "");
-    });
-}
-
 function bindSettingsHandlers() {
     $("#fmt_auto_scan").on("input", (e) => {
         const checked = Boolean($(e.target).prop("checked"));
@@ -1083,18 +947,11 @@ function bindSettingsHandlers() {
         saveSettingsDebounced();
     });
 
-    $("#fmt_show_floating_button").on("input", (e) => {
-        extension_settings[extensionName].showFloatingButton = Boolean($(e.target).prop("checked"));
-        saveSettingsDebounced();
-        applyFloatingButtonVisibility();
-    });
-
     bindNumberSetting("#fmt_skip_count", "skipCount", 2);
     $("#fmt_skip_count").on("input", applyVisualHiding);
 
     bindNumberSetting("#fmt_scan_interval", "scanInterval", 1);
     bindNumberSetting("#fmt_compress_after", "compressAfter", 2);
-    bindOptionalNumberSetting("#fmt_summary_token_limit", "summaryTokenLimit", MIN_SUMMARY_TOKEN_LIMIT);
 
     $("#fmt_use_custom_provider").on("input", (e) => {
         const checked = Boolean($(e.target).prop("checked"));
@@ -1196,8 +1053,7 @@ jQuery(async () => {
             readState, writeState, patchState, commitState, flushPendingCommit,
             getFacts, getLayerSummary, getIsHidden, getLastScanned,
             buildFullContext, buildContextFromState, isHidingActive, getModelVisibleIndices,
-            getSkipCount, getScanInterval, getCompressAfter, getSummaryTokenLimit, buildSummarySizeInstruction, shouldCompressFacts,
-            isFloatingButtonEnabled, applyFloatingButtonVisibility, openSummaryModal, closeSummaryModal,
+            getSkipCount, getScanInterval, getCompressAfter, shouldCompressFacts,
             escapeHtml, parseBatchResponse, mapBatchSummaries, splitIntoScanChunks,
             pruneEmptyChats, clampScanCursor, rawIndexToVisiblePosition,
             migrateChatFromSettings, handleChatRenamed,
@@ -1208,13 +1064,6 @@ jQuery(async () => {
         };
 
         console.log(`[${extensionName}] ✅ Loaded (v${extensionVersion}) from ${extensionFolderPath}. Debug API: window.SummaryTracker`);
-
-        // Отдельный try: сбой плавающей кнопки не должен ронять само расширение.
-        try {
-            setupFloatingUi();
-        } catch (floatError) {
-            console.error(`[${extensionName}] ❌ Floating button failed:`, floatError);
-        }
     } catch (error) {
         console.error(`[${extensionName}] ❌ Load failed:`, error);
         // Молчаливый провал выглядел как «расширение просто не появилось в списке».
