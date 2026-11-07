@@ -8,28 +8,6 @@
 
 A minimalist extension that hides messages from the context and extracts their essence, sending only the most important information into the chat context. It is designed to maximize token/cost efficiency, extend API key lifespan, and maintain context coherence during roleplay.
 
-### Fixed & Added
-
-* **v1.3.3** — fixed a hang with slow custom providers: the request timeout used to stop counting as soon as the provider sent its response headers, so a provider that kept the body open could freeze the scan forever and the **Scan** button then did nothing. The timeout now covers reading the whole response. New setting **Request timeout, sec** (10–900, default 60; reasoning models may need 180–300). The **Scan** button now answers with a toast while a scan is already running instead of staying silent
-* **v1.3.2** — the custom-provider limit field is renamed to **Summarizer max tokens** and is clearly separate from the chat's "Response (tokens)": the extension never reads the chat setting. Leaving the field empty now means no `max_tokens` is sent at all (the provider decides); the default stays 2048. Some providers require a limit and reject requests without one — the error toast will say so, just enter a number then
-* **v1.3.1** — diagnostics for cut-off model replies. The extension now reads the provider's `finish_reason` and shows a toast when the reply was cut off (token limit vs. a model/proxy filter), and scan/compression errors now say the actual reason instead of a bare "Error". New custom-provider setting **Max response tokens** (renamed in 1.3.2) (default 2048, i.e. unchanged behavior): reasoning models such as Gemini 3 spend the same budget on thinking, so a reply can be cut mid-JSON — raise it to 8192 or more for them
-* **v1.3.0** — memory moved out of the global settings file into the chat's own `chat_metadata`. Facts now travel with the chat: renaming a chat no longer wipes them, two characters with identically named chat files no longer share memory, and exporting a chat carries its summary along. Data saved by v1.2.0 is migrated automatically the first time you open each chat
-* **v1.3.0** — the scan cursor can only move forward. Raising "Leave messages" used to rewind it and re-summarize the same messages
-* **v1.3.0** — if the model returns fewer summaries than the batch contained, the cursor stops at the last confirmed one and you get a warning. Previously the missing messages were dropped from memory silently
-* **v1.3.0** — long scans are split into chunks (20 messages / 24k characters) and sent one after another, so the first scan of a large chat no longer overflows the context or gets rejected by the provider
-* **v1.3.0** — ghost-hidden messages (`is_system`) are skipped by the scanner too, so scanning and hiding finally operate on the same set of messages
-* **v1.3.0** — swipes no longer hide one message too many, and other extensions' background generations (built-in Summarize, `/gen`, image prompts) receive the full untruncated history
-* **v1.3.0** — the custom provider request has a 60-second timeout, sends `max_tokens`, and falls back to `reasoning_content` when a reasoning model leaves `content` empty. A hung provider no longer freezes auto-scanning until you reload the page
-* **v1.3.0** — the extension folder is resolved at runtime, so a ZIP install into a differently named folder works; a failed load now shows an error instead of failing silently
-* **v1.3.0** — deleting the summary (the trash icon) now also resets the scan cursor. Previously Scan answered "No new messages to scan" right after a delete, and the chat could never be re-summarized
-* **v1.3.0** — pressing Scan when every message fits inside the "leave visible" window now says so instead of doing nothing at all
-* **v1.3.0** — the summary is edited in a real textarea instead of a browser `prompt()`
-* **v1.2.0** — hiding no longer modifies the real chat array. The extension now uses SillyTavern's official `generate_interceptor` hook, which receives a *copy* of the history. This fixes truncated chats being written to disk, streaming text landing in the wrong message bubble, and swipe/continue overwriting an earlier message
-* **v1.2.0** — a scan is now bound to the chat it started in, so switching chats mid-summarization no longer writes facts into the wrong chat
-* **v1.2.0** — if the model replies with plain text instead of JSON, the reply is stored as a single fact and the scan cursor moves on, instead of re-sending the same range to the model on every new message
-* Fixed a bug with visual hiding of messages, when it showed empty space instead of messages
-* Added an option to set the summarization frequency when auto-scanning is enabled. The value specifies how many messages should pass between summarizations; 1 means every message is summarized
-
 ### Features
 
 * You control how many of the most recent messages remain visible; at minimum, the latest message from both the bot and the user
@@ -79,28 +57,6 @@ My Telegram-channel: [@sillytavern1](https://t.me/sillytavern1)
 ### О расширении
 
 Минималистичное расширение, которое скрывает сообщения из контекста и вытаскивает их суть в виде саммари, отправляя в контекст чата только его. Нужно для максимальной экономии токенов/денег, продления жизни API-ключей и сохранения связности контекста во время РП.
-
-### Исправлено и добавлено
-
-* **v1.3.3** — исправлено зависание при медленном кастомном провайдере: таймаут запроса переставал считаться, как только провайдер отдавал заголовки ответа, и если тело ответа «зависало», скан замирал навсегда, а кнопка **Scan** переставала реагировать. Теперь таймаут охватывает чтение всего ответа. Новая настройка **Request timeout, sec** (10–900, по умолчанию 60; «думающим» моделям может понадобиться 180–300). Кнопка **Scan** во время идущего скана теперь отвечает тостом, а не молчит
-* **v1.3.2** — поле лимита для кастомного провайдера переименовано в **Summarizer max tokens** и явно отделено от «Response (tokens)» в чате: расширение эту настройку вообще не читает. Пустое поле теперь значит «max_tokens не передаётся вовсе» (длину решает провайдер); по умолчанию остаётся 2048. Некоторые провайдеры требуют лимит и отклоняют запросы без него — тост с ошибкой это покажет, тогда впишите число
-* **v1.3.1** — диагностика оборванных ответов модели. Расширение читает `finish_reason` провайдера и показывает тост, если ответ оборван (лимит токенов или фильтр модели/прокси); ошибки скана и сжатия теперь называют реальную причину вместо голого «Ошибка». Новая настройка кастомного провайдера **Max response tokens** (по умолчанию 2048, то есть поведение прежнее): «думающие» модели вроде Gemini 3 тратят тот же лимит на рассуждения, и ответ может оборваться посреди JSON — для них поставьте 8192 и выше
-* **v1.3.0** — память переехала из общего файла настроек в `chat_metadata` самого чата. Теперь факты живут вместе с чатом: переименование чата их больше не стирает, два персонажа с одинаковым именем файла чата больше не делят одну память, а при экспорте чата саммари уезжает вместе с ним. Данные, накопленные в v1.2.0, переносятся автоматически при первом открытии каждого чата
-* **v1.3.0** — курсор сканирования может только идти вперёд. Раньше увеличение «Leave messages» откатывало его назад, и одни и те же сообщения суммаризировались повторно
-* **v1.3.0** — если модель вернула меньше саммари, чем было сообщений в пачке, курсор останавливается на последнем подтверждённом, и показывается предупреждение. Раньше недостающие сообщения молча выпадали из памяти
-* **v1.3.0** — длинный скан режется на пачки (20 сообщений / 24 тысячи символов) и отправляется последовательно, поэтому первый скан большого чата больше не переполняет контекст и не отлетает у провайдера
-* **v1.3.0** — сообщения, скрытые «призраком» (`is_system`), теперь пропускает и сканер: скан и скрытие наконец работают с одним и тем же набором сообщений
-* **v1.3.0** — при свайпе больше не прячется одно лишнее сообщение, а фоновые генерации других расширений (встроенный Summarize, `/gen`, промпты для картинок) получают полную необрезанную историю
-* **v1.3.0** — у запроса к кастомному провайдеру появился таймаут в 60 секунд и `max_tokens`, а при пустом `content` читается `reasoning_content` (так отвечают reasoning-модели). Зависший провайдер больше не блокирует автоскан до перезагрузки страницы
-* **v1.3.0** — папка расширения определяется во время выполнения, поэтому установка ZIP-архивом в папку с другим именем тоже работает; при неудачной загрузке теперь показывается ошибка, а не тишина
-* **v1.3.0** — удаление саммари (иконка корзины) теперь сбрасывает и курсор сканирования. Раньше сразу после удаления Scan отвечал «No new messages to scan», и чат было невозможно просаммаризировать заново
-* **v1.3.0** — если все сообщения попадают в окно «оставить видимыми», Scan теперь так и говорит, а не молчит, будто кнопка сломана
-* **v1.3.0** — саммари правится в обычной textarea, а не в браузерном `prompt()`
-* **v1.2.0** — скрытие больше не меняет реальный массив чата. Расширение перешло на штатный хук SillyTavern `generate_interceptor`, который получает *копию* истории. Это чинит запись обрезанного чата на диск, попадание стриминга в чужой пузырь сообщения и перезапись старого сообщения при свайпе и Continue
-* **v1.2.0** — скан привязан к тому чату, в котором был начат: переключение чата во время саммаризации больше не записывает факты в чужой чат
-* **v1.2.0** — если модель ответила обычным текстом вместо JSON, ответ сохраняется одним фактом и курсор сдвигается вперёд, а не гоняет один и тот же диапазон через модель на каждом новом сообщении
-* Исправлена ​​ошибка визуального скрытия сообщений, когда вместо сообщений отображалось пустое пространство
-* Добавлена ​​возможность ввести число, через сколько сообщений будет происходить каждый самрайз при включенном автосканировании, где 1 означает самрайз каждого сообщения
 
 ### Особенности
 
