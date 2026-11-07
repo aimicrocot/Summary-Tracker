@@ -49,6 +49,11 @@
                     <label for="fmt_custom_api_model">Model:</label>
                     <input id="fmt_custom_api_model" class="text_bg fmt-text-input" type="text" placeholder="deepseek/deepseek-chat" />
                 </div>
+                <div class="fmt-field">
+                    <label for="fmt_max_response_tokens">Summarizer max tokens:</label>
+                    <input id="fmt_max_response_tokens" class="text_bg fmt-number-input" type="number" min="256" step="256" placeholder="no limit" />
+                    <small class="fmt-hint">Лимит ответа только для запросов саммари к этому провайдеру. С настройкой «Response (tokens)» в чате не связан. Пусто — лимит не передаётся вовсе, длину решает провайдер (по умолчанию 2048). Если провайдер требует лимит и отвечает ошибкой, впишите число (минимум 256).</small>
+                </div>
                 <input id="fmt_test_custom_provider" class="menu_button" type="button" value="Test Connection" />
             </div>
 

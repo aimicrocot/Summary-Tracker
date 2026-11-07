@@ -2,7 +2,7 @@ import { extension_settings, getContext } from "../../../extensions.js";
 import { saveSettingsDebounced, eventSource, event_types } from "../../../../script.js";
 
 const extensionName = "Summary-Tracker";
-const extensionVersion = "1.3.0";
+const extensionVersion = "1.3.2";
 
 // Папка на диске задаёт путь к статике, а не название расширения: установка через
 // Extensions → Install даёт "Summary-Tracker", а ZIP с GitHub распаковывается в
@@ -27,6 +27,14 @@ const SCAN_CHUNK_CHARS = 24000;
 // fallback-факт на всю партию считается за единицу и иначе рос бы бесконечно.
 const COMPRESS_CHARS = 8000;
 const CUSTOM_REQUEST_TIMEOUT_MS = 60000;
+// Потолок ответа для запроса саммари к кастомному провайдеру. Это отдельная настройка расширения:
+// с лимитом ответа в чате («Response (tokens)») она никак не связана. У «думающих» моделей
+// рассуждения тратят тот же лимит, поэтому 2048 им может не хватить. Значение 0 — лимит не
+// передаётся вовсе. По умолчанию — прежние 2048.
+const CUSTOM_MAX_TOKENS_DEFAULT = 2048;
+const MIN_CUSTOM_MAX_TOKENS = 256;
+// Значения finish_reason, при которых ответ дописан до конца.
+const NORMAL_FINISH_REASONS = ["stop", "end_turn", "stop_sequence", "eos"];
 
 const defaultSettings = {
     autoScan: false,
@@ -34,6 +42,7 @@ const defaultSettings = {
     skipCount: 2,
     scanInterval: 1,
     compressAfter: 20,
+    maxResponseTokens: 2048,
     useCustomProvider: false,
     customApiUrl: "",
     customApiKey: "",
@@ -78,6 +87,15 @@ function getScanInterval() {
 function getCompressAfter() {
     const raw = parseInt(extension_settings[extensionName].compressAfter);
     return Number.isFinite(raw) && raw >= 2 ? raw : 20;
+}
+
+// 0 означает «лимит не передавать». Любое непригодное значение (мусор, меньше минимума)
+// заменяется безопасными 2048, а не молча превращается в «без лимита».
+function getMaxResponseTokens() {
+    const stored = extension_settings[extensionName].maxResponseTokens;
+    if (stored === 0 || stored === "0") return 0;
+    const raw = parseInt(stored);
+    return Number.isFinite(raw) && raw >= MIN_CUSTOM_MAX_TOKENS ? raw : CUSTOM_MAX_TOKENS_DEFAULT;
 }
 
 function getChatArray() {
@@ -310,10 +328,34 @@ async function callSummarizerLLM(promptText, systemPrompt) {
     return await sendCustomProviderRequest(promptText, systemPrompt);
 }
 
+// Провайдер сообщает, почему остановил генерацию. Без этого нельзя отличить «ответ оборван
+// по лимиту токенов» от «сработал фильтр модели», а на телефоне консоли нет — поэтому
+// причину показываем тостом.
+function reportAbnormalFinish(finishReason, maxTokens, usage) {
+    if (!finishReason) return;
+    const reason = String(finishReason).toLowerCase();
+    if (NORMAL_FINISH_REASONS.includes(reason)) return;
+
+    console.warn(`[${extensionName}] Provider finish_reason=${finishReason}, max_tokens=${maxTokens || "не передан"}`, usage ?? "");
+
+    let text;
+    if (reason === "length" || reason === "max_tokens") {
+        text = maxTokens > 0
+            ? `Ответ модели оборван по лимиту токенов (лимит ${maxTokens}). Увеличьте «Summarizer max tokens» в настройках расширения или очистите поле, чтобы лимит не передавался.`
+            : "Ответ модели оборван по лимиту токенов на стороне провайдера: расширение лимит не передаёт. Смените модель или прокси либо укажите лимит в настройках расширения.";
+    } else if (/filter|safety|prohibit|block|recitation/.test(reason)) {
+        text = `Ответ прерван фильтром модели или прокси (finish_reason: ${finishReason}). Лимит токенов тут ни при чём.`;
+    } else {
+        text = `Провайдер прервал ответ: finish_reason = ${finishReason}.`;
+    }
+    toastr.warning(text, "Summary Tracker", { timeOut: 15000 });
+}
+
 async function sendCustomProviderRequest(userPrompt, systemPrompt) {
     const apiUrl = extension_settings[extensionName].customApiUrl;
     const apiKey = extension_settings[extensionName].customApiKey;
     const model = extension_settings[extensionName].customApiModel;
+    const maxTokens = getMaxResponseTokens();
 
     if (!apiUrl || !model) {
         throw new Error("Custom provider URL or model not configured");
@@ -347,7 +389,7 @@ async function sendCustomProviderRequest(userPrompt, systemPrompt) {
                     { role: "user", content: userPrompt }
                 ],
                 temperature: 0.3,
-                max_tokens: 2048
+                ...(maxTokens > 0 ? { max_tokens: maxTokens } : {})
             })
         });
     } catch (error) {
@@ -365,10 +407,13 @@ async function sendCustomProviderRequest(userPrompt, systemPrompt) {
     }
 
     const data = await response.json();
-    const message = data?.choices?.[0]?.message;
+    const choice = data?.choices?.[0];
+    const message = choice?.message;
+    const finishReason = choice?.finish_reason ?? choice?.native_finish_reason ?? null;
+    reportAbnormalFinish(finishReason, maxTokens, data?.usage);
     // Reasoning-модели кладут текст в reasoning_content, оставляя content пустым.
     const content = message?.content || message?.reasoning_content;
-    if (!content) throw new Error("Custom provider returned empty response");
+    if (!content) throw new Error(`Custom provider returned empty response (finish_reason: ${finishReason ?? "не указан"})`);
     return content;
 }
 
@@ -413,7 +458,7 @@ async function maybeCompressFacts(state) {
         }
     } catch (error) {
         console.error(`[${extensionName}] Compression error:`, error);
-        toastr.error("Ошибка сжатия", "Summary Tracker");
+        toastr.error(`Ошибка сжатия: ${String(error?.message ?? error).slice(0, 300)}`, "Summary Tracker", { timeOut: 15000 });
     }
 }
 
@@ -856,7 +901,7 @@ async function runAutoScan() {
         // пропадут вместе с неудачной.
         commitState(chatId, state);
         if (getCurrentChatId() === chatId) refreshUi();
-        toastr.error("Ошибка сканирования", "Summary Tracker");
+        toastr.error(`Ошибка сканирования: ${String(error?.message ?? error).slice(0, 300)}`, "Summary Tracker", { timeOut: 15000 });
     } finally {
         isScanning = false;
     }
@@ -905,6 +950,7 @@ function loadSettings() {
     $("#fmt_custom_api_url").val(settings.customApiUrl);
     $("#fmt_custom_api_key").val(settings.customApiKey);
     $("#fmt_custom_api_model").val(settings.customApiModel);
+    $("#fmt_max_response_tokens").val(getMaxResponseTokens() || "");
     $("#fmt_custom_provider_panel").css("display", settings.useCustomProvider ? "block" : "none");
 
     $("#fmt_scan_interval").prop("disabled", !settings.autoScan);
@@ -933,6 +979,27 @@ function bindNumberSetting(selector, key, minimum) {
     });
 }
 
+// В отличие от bindNumberSetting, пустое поле здесь осмысленно: оно значит «лимит не передавать».
+function bindOptionalNumberSetting(selector, key, minimum, read) {
+    $(selector).on("input", (e) => {
+        const text = String($(e.target).val() ?? "").trim();
+        if (text === "") {
+            extension_settings[extensionName][key] = 0;
+            saveSettingsDebounced();
+            return;
+        }
+        const raw = parseInt(text);
+        if (!Number.isFinite(raw) || raw < minimum) return;
+        extension_settings[extensionName][key] = raw;
+        saveSettingsDebounced();
+    });
+
+    // Ушли из поля с мусором — возвращаем то, что реально действует.
+    $(selector).on("blur", () => {
+        $(selector).val(read() || "");
+    });
+}
+
 function bindSettingsHandlers() {
     $("#fmt_auto_scan").on("input", (e) => {
         const checked = Boolean($(e.target).prop("checked"));
@@ -952,6 +1019,7 @@ function bindSettingsHandlers() {
 
     bindNumberSetting("#fmt_scan_interval", "scanInterval", 1);
     bindNumberSetting("#fmt_compress_after", "compressAfter", 2);
+    bindOptionalNumberSetting("#fmt_max_response_tokens", "maxResponseTokens", MIN_CUSTOM_MAX_TOKENS, getMaxResponseTokens);
 
     $("#fmt_use_custom_provider").on("input", (e) => {
         const checked = Boolean($(e.target).prop("checked"));
@@ -1053,7 +1121,7 @@ jQuery(async () => {
             readState, writeState, patchState, commitState, flushPendingCommit,
             getFacts, getLayerSummary, getIsHidden, getLastScanned,
             buildFullContext, buildContextFromState, isHidingActive, getModelVisibleIndices,
-            getSkipCount, getScanInterval, getCompressAfter, shouldCompressFacts,
+            getSkipCount, getScanInterval, getCompressAfter, getMaxResponseTokens, shouldCompressFacts,
             escapeHtml, parseBatchResponse, mapBatchSummaries, splitIntoScanChunks,
             pruneEmptyChats, clampScanCursor, rawIndexToVisiblePosition,
             migrateChatFromSettings, handleChatRenamed,

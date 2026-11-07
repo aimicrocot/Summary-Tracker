@@ -10,6 +10,8 @@ A minimalist extension that hides messages from the context and extracts their e
 
 ### Fixed & Added
 
+* **v1.3.2** — the custom-provider limit field is renamed to **Summarizer max tokens** and is clearly separate from the chat's "Response (tokens)": the extension never reads the chat setting. Leaving the field empty now means no `max_tokens` is sent at all (the provider decides); the default stays 2048. Some providers require a limit and reject requests without one — the error toast will say so, just enter a number then
+* **v1.3.1** — diagnostics for cut-off model replies. The extension now reads the provider's `finish_reason` and shows a toast when the reply was cut off (token limit vs. a model/proxy filter), and scan/compression errors now say the actual reason instead of a bare "Error". New custom-provider setting **Max response tokens** (renamed in 1.3.2) (default 2048, i.e. unchanged behavior): reasoning models such as Gemini 3 spend the same budget on thinking, so a reply can be cut mid-JSON — raise it to 8192 or more for them
 * **v1.3.0** — memory moved out of the global settings file into the chat's own `chat_metadata`. Facts now travel with the chat: renaming a chat no longer wipes them, two characters with identically named chat files no longer share memory, and exporting a chat carries its summary along. Data saved by v1.2.0 is migrated automatically the first time you open each chat
 * **v1.3.0** — the scan cursor can only move forward. Raising "Leave messages" used to rewind it and re-summarize the same messages
 * **v1.3.0** — if the model returns fewer summaries than the batch contained, the cursor stops at the last confirmed one and you get a warning. Previously the missing messages were dropped from memory silently
@@ -79,6 +81,8 @@ My Telegram-channel: [@sillytavern1](https://t.me/sillytavern1)
 
 ### Исправлено и добавлено
 
+* **v1.3.2** — поле лимита для кастомного провайдера переименовано в **Summarizer max tokens** и явно отделено от «Response (tokens)» в чате: расширение эту настройку вообще не читает. Пустое поле теперь значит «max_tokens не передаётся вовсе» (длину решает провайдер); по умолчанию остаётся 2048. Некоторые провайдеры требуют лимит и отклоняют запросы без него — тост с ошибкой это покажет, тогда впишите число
+* **v1.3.1** — диагностика оборванных ответов модели. Расширение читает `finish_reason` провайдера и показывает тост, если ответ оборван (лимит токенов или фильтр модели/прокси); ошибки скана и сжатия теперь называют реальную причину вместо голого «Ошибка». Новая настройка кастомного провайдера **Max response tokens** (по умолчанию 2048, то есть поведение прежнее): «думающие» модели вроде Gemini 3 тратят тот же лимит на рассуждения, и ответ может оборваться посреди JSON — для них поставьте 8192 и выше
 * **v1.3.0** — память переехала из общего файла настроек в `chat_metadata` самого чата. Теперь факты живут вместе с чатом: переименование чата их больше не стирает, два персонажа с одинаковым именем файла чата больше не делят одну память, а при экспорте чата саммари уезжает вместе с ним. Данные, накопленные в v1.2.0, переносятся автоматически при первом открытии каждого чата
 * **v1.3.0** — курсор сканирования может только идти вперёд. Раньше увеличение «Leave messages» откатывало его назад, и одни и те же сообщения суммаризировались повторно
 * **v1.3.0** — если модель вернула меньше саммари, чем было сообщений в пачке, курсор останавливается на последнем подтверждённом, и показывается предупреждение. Раньше недостающие сообщения молча выпадали из памяти

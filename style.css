@@ -19,6 +19,11 @@
     border-radius: 4px;
 }
 
+.summary-tracker-settings #fmt_max_response_tokens {
+    width: 80px;
+    max-width: 80px;
+}
+
 .summary-tracker-settings .fmt-text-input {
     width: 100%;
     padding: 4px;
