@@ -54,6 +54,11 @@
                     <input id="fmt_max_response_tokens" class="text_bg fmt-number-input" type="number" min="256" step="256" placeholder="no limit" />
                     <small class="fmt-hint">Лимит ответа только для запросов саммари к этому провайдеру. С настройкой «Response (tokens)» в чате не связан. Пусто — лимит не передаётся вовсе, длину решает провайдер (по умолчанию 2048). Если провайдер требует лимит и отвечает ошибкой, впишите число (минимум 256).</small>
                 </div>
+                <div class="fmt-field">
+                    <label for="fmt_request_timeout">Request timeout, sec:</label>
+                    <input id="fmt_request_timeout" class="text_bg fmt-number-input" type="number" min="10" max="900" step="10" />
+                    <small class="fmt-hint">Сколько ждать ответ провайдера на один запрос (10–900, по умолчанию 60). «Думающим» моделям на партию из 20 сообщений 60 секунд может не хватить: ставьте 180–300. Таймаут действует и на получение ответа целиком.</small>
+                </div>
                 <input id="fmt_test_custom_provider" class="menu_button" type="button" value="Test Connection" />
             </div>
 

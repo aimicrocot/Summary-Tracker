@@ -2,7 +2,7 @@ import { extension_settings, getContext } from "../../../extensions.js";
 import { saveSettingsDebounced, eventSource, event_types } from "../../../../script.js";
 
 const extensionName = "Summary-Tracker";
-const extensionVersion = "1.3.2";
+const extensionVersion = "1.3.3";
 
 // Папка на диске задаёт путь к статике, а не название расширения: установка через
 // Extensions → Install даёт "Summary-Tracker", а ZIP с GitHub распаковывается в
@@ -26,7 +26,10 @@ const SCAN_CHUNK_CHARS = 24000;
 // Порог сжатия по объёму нужен в дополнение к «сжимать после N фактов»: один
 // fallback-факт на всю партию считается за единицу и иначе рос бы бесконечно.
 const COMPRESS_CHARS = 8000;
+// Таймаут по умолчанию; настраивается в панели кастомного провайдера (requestTimeoutSec).
 const CUSTOM_REQUEST_TIMEOUT_MS = 60000;
+const MIN_REQUEST_TIMEOUT_SEC = 10;
+const MAX_REQUEST_TIMEOUT_SEC = 900;
 // Потолок ответа для запроса саммари к кастомному провайдеру. Это отдельная настройка расширения:
 // с лимитом ответа в чате («Response (tokens)») она никак не связана. У «думающих» моделей
 // рассуждения тратят тот же лимит, поэтому 2048 им может не хватить. Значение 0 — лимит не
@@ -43,6 +46,7 @@ const defaultSettings = {
     scanInterval: 1,
     compressAfter: 20,
     maxResponseTokens: 2048,
+    requestTimeoutSec: 60,
     useCustomProvider: false,
     customApiUrl: "",
     customApiKey: "",
@@ -55,6 +59,7 @@ const defaultSettings = {
 };
 
 let isScanning = false; // одновременно допускаем только один запрос к суммаризатору
+let scanStartedAt = 0;  // нужен только для сообщения «сканирование уже идёт»
 let isEditingSummary = false; // перерисовка панели не должна убивать открытый редактор
 let pendingLegacyHidden = null; // глобальный isHidden из версий до 1.2 ждёт открытия чата
 
@@ -96,6 +101,14 @@ function getMaxResponseTokens() {
     if (stored === 0 || stored === "0") return 0;
     const raw = parseInt(stored);
     return Number.isFinite(raw) && raw >= MIN_CUSTOM_MAX_TOKENS ? raw : CUSTOM_MAX_TOKENS_DEFAULT;
+}
+
+// Значение вне 10–900 секунд (мусор, 0, отрицательное) заменяется прежними 60 с.
+function getRequestTimeoutMs() {
+    const raw = parseInt(extension_settings[extensionName].requestTimeoutSec);
+    return Number.isFinite(raw) && raw >= MIN_REQUEST_TIMEOUT_SEC && raw <= MAX_REQUEST_TIMEOUT_SEC
+        ? raw * 1000
+        : CUSTOM_REQUEST_TIMEOUT_MS;
 }
 
 function getChatArray() {
@@ -374,9 +387,13 @@ async function sendCustomProviderRequest(userPrompt, systemPrompt) {
     // Без таймаута зависший провайдер оставлял бы isScanning навсегда взведённым:
     // finally не отрабатывает, и автоскан молча умирал до перезагрузки страницы.
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), CUSTOM_REQUEST_TIMEOUT_MS);
+    const timeoutMs = getRequestTimeoutMs();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-    let response;
+    // Таймер действует, пока ответ не прочитан целиком. Провайдер может сразу отдать заголовки,
+    // а тело держать минутами (долгое «мышление»): раньше таймер снимался после заголовков, запрос
+    // висел вечно, isScanning оставался взведённым и кнопка Scan молча не реагировала.
+    let response, data;
     try {
         response = await fetch(endpoint, {
             method: "POST",
@@ -392,21 +409,21 @@ async function sendCustomProviderRequest(userPrompt, systemPrompt) {
                 ...(maxTokens > 0 ? { max_tokens: maxTokens } : {})
             })
         });
+
+        if (!response.ok) {
+            const errText = await response.text().catch(() => "Unknown error");
+            throw new Error(`Custom provider request failed (${response.status}): ${errText}`);
+        }
+
+        data = await response.json();
     } catch (error) {
         if (error?.name === "AbortError") {
-            throw new Error(`Custom provider timed out after ${CUSTOM_REQUEST_TIMEOUT_MS / 1000}s`);
+            throw new Error(`Custom provider timed out after ${timeoutMs / 1000}s — увеличьте «Request timeout» в настройках расширения`);
         }
         throw error;
     } finally {
         clearTimeout(timer);
     }
-
-    if (!response.ok) {
-        const errText = await response.text().catch(() => "Unknown error");
-        throw new Error(`Custom provider request failed (${response.status}): ${errText}`);
-    }
-
-    const data = await response.json();
     const choice = data?.choices?.[0];
     const message = choice?.message;
     const finishReason = choice?.finish_reason ?? choice?.native_finish_reason ?? null;
@@ -853,6 +870,7 @@ async function runAutoScan() {
     }
 
     isScanning = true;
+    scanStartedAt = Date.now();
     const chunks = splitIntoScanChunks(messagesToScan);
     toastr.info(
         chunks.length > 1
@@ -951,6 +969,7 @@ function loadSettings() {
     $("#fmt_custom_api_key").val(settings.customApiKey);
     $("#fmt_custom_api_model").val(settings.customApiModel);
     $("#fmt_max_response_tokens").val(getMaxResponseTokens() || "");
+    $("#fmt_request_timeout").val(getRequestTimeoutMs() / 1000);
     $("#fmt_custom_provider_panel").css("display", settings.useCustomProvider ? "block" : "none");
 
     $("#fmt_scan_interval").prop("disabled", !settings.autoScan);
@@ -963,12 +982,12 @@ function loadSettings() {
 
 // Пустое поле ввода — это промежуточное состояние набора, а не «поставь минимум».
 // Раньше очистка поля молча писала в настройки 2, и UI расходился со стейтом.
-function bindNumberSetting(selector, key, minimum) {
+function bindNumberSetting(selector, key, minimum, maximum = Infinity) {
     $(selector).on("input", (e) => {
         const text = String($(e.target).val() ?? "").trim();
         if (text === "") return;
         const raw = parseInt(text);
-        if (!Number.isFinite(raw) || raw < minimum) return;
+        if (!Number.isFinite(raw) || raw < minimum || raw > maximum) return;
         extension_settings[extensionName][key] = raw;
         saveSettingsDebounced();
     });
@@ -1020,6 +1039,7 @@ function bindSettingsHandlers() {
     bindNumberSetting("#fmt_scan_interval", "scanInterval", 1);
     bindNumberSetting("#fmt_compress_after", "compressAfter", 2);
     bindOptionalNumberSetting("#fmt_max_response_tokens", "maxResponseTokens", MIN_CUSTOM_MAX_TOKENS, getMaxResponseTokens);
+    bindNumberSetting("#fmt_request_timeout", "requestTimeoutSec", MIN_REQUEST_TIMEOUT_SEC, MAX_REQUEST_TIMEOUT_SEC);
 
     $("#fmt_use_custom_provider").on("input", (e) => {
         const checked = Boolean($(e.target).prop("checked"));
@@ -1045,7 +1065,18 @@ function bindSettingsHandlers() {
 
     $("#fmt_test_custom_provider").on("click", testCustomProviderConnection);
 
-    $("#fmt_manual_scan").on("click", () => runAutoScan());
+    $("#fmt_manual_scan").on("click", () => {
+        // Автоскан занятый момент молча пропускает, а ручной клик без реакции выглядит как поломка.
+        if (isScanning) {
+            const seconds = Math.round((Date.now() - scanStartedAt) / 1000);
+            const limit = extension_settings[extensionName].useCustomProvider
+                ? ` Запрос к модели ограничен ${getRequestTimeoutMs() / 1000} с.`
+                : "";
+            toastr.info(`Сканирование уже идёт (${seconds} с). Дождитесь результата.${limit}`, "Summary Tracker");
+            return;
+        }
+        runAutoScan();
+    });
 
     $("#fmt_clear_facts").on("click", () => {
         if (!confirm("Очистить всё?")) return;
@@ -1121,7 +1152,7 @@ jQuery(async () => {
             readState, writeState, patchState, commitState, flushPendingCommit,
             getFacts, getLayerSummary, getIsHidden, getLastScanned,
             buildFullContext, buildContextFromState, isHidingActive, getModelVisibleIndices,
-            getSkipCount, getScanInterval, getCompressAfter, getMaxResponseTokens, shouldCompressFacts,
+            getSkipCount, getScanInterval, getCompressAfter, getMaxResponseTokens, getRequestTimeoutMs, shouldCompressFacts,
             escapeHtml, parseBatchResponse, mapBatchSummaries, splitIntoScanChunks,
             pruneEmptyChats, clampScanCursor, rawIndexToVisiblePosition,
             migrateChatFromSettings, handleChatRenamed,
