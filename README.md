@@ -113,3 +113,9 @@ My Telegram-channel: [@sillytavern1](https://t.me/sillytavern1)
 
 - [https://github.com/Kristyku/InlineSummary](https://github.com/Kristyku/InlineSummary)
 - [https://github.com/Lodactio/Extension-Summaryception](https://github.com/Lodactio/Extension-Summaryception)
+
+
+### Дорожная карта
+
+1. Добавить ограничение на количество токенов итогового самрайза, который пойдёт в промт.
+2. Добавить переключатель для включения/отключения многослойной памяти.
